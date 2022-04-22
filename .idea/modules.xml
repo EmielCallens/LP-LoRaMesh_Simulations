@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/LP-LoRaMesh_Simulations.iml" filepath="$PROJECT_DIR$/.idea/LP-LoRaMesh_Simulations.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/LP_LoRaMesh_Simulations.iml" filepath="$PROJECT_DIR$/.idea/LP_LoRaMesh_Simulations.iml" />
     </modules>
   </component>
 </project>
