@@ -4,6 +4,9 @@ import random
 import threading
 import time
 from functools import reduce
+import re
+import sqlite3
+import csv
 '''
 print("5 + 2 =", 5+2)
 print("5 - 2 =", 5-2)
@@ -322,15 +325,54 @@ for i in range(10):
 
     print("Active Thread:", threading.activeCount())
     print("Thread Objects:", threading.enumerate())
+#Regular Expressions - locate and change strings
+import re
+if re.search("ape", "The ape at the apex"):
+    print("There is an ape")
+allApes = re.findall("ape", "The ape at the apex")
+for i in allApes:
+    print(i)
+the_str = "The ape at the apex"
+#ape. means ape followed by a single character
+#find iterate or finditer, returns the indexes in the string instead of the word
+for i in re.finditer("ape.", the_str):
+    loc_tuple = i.span() #span returns the tuple
+    print(loc_tuple)
+    print(the_str[loc_tuple[0]:loc_tuple[1]]) #use indexes found ith finditer and saved in the tuple to slice the string
+#Databases
+import sqlite3
+import csv
+def print_DB():
+    try:
+        result = theCursor.execute("SELECT id, FName, LName, Age, Address, Salary,  HireDate FROM Employees")
+        for row in result:
+            print("ID:", row[0])
+            print("FName:", row[1])
+            print("LName:", row[2])
+            print("Age:", row[3])
+            print("Address:", row[4])
+            print("Salary:", row[5])
+            print("HireDate:", row[6])
+    except sqlite3.OperationalError:
+        print("The table doesn't exist")
+    except:
+        print("General error")
+db_conn = sqlite3.connect('test.db')
+print("Database created")
+theCursor = db_conn.cursor()
+try:
+    db_conn.execute("CREATE TABLE Employees(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, FName TEXT NOT NULL, LName NOT NULL, Age INT NOT NULL, Address TEXT, Salary REAL, HireDate TEXT);")
+    db_conn.commit()
+    print("Table Created")
+except sqlite3.OperationalError:
+    print("Table Not Created")
+except:
+    print("General Error")
+db_conn.execute("INSERT INTO Employees (FName, LName, Age, Address, Salary, HireDate)" "VALUES ('Derek', 'Banas', 41, '123 Main st', '500,000', date('now'))")
+db_conn.commit()
+print_DB()
+db_conn.close()
 '''
-
-
-
-
-
-
-
-
 
 
 
