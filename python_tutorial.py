@@ -147,7 +147,6 @@ heroes["Flash"] = "Barry Allen"
 print(list(heroes.items()))
 print(list(heroes.keys()))
 print(list(heroes.values()))
-
 del heroes["Flash"]
 print(heroes.pop("Batman"))
 print("Superman" in heroes)
