@@ -1,15 +1,22 @@
+
+"""
+    - Add multiple sinks? define how many sinks, max of one on each available spot (9)
+        - Sinks don't get a normal id but are sid = s0, s1, s2, ...
+    - Sink placement on these different ways needed:
+        - border_* with * = north, east, south, west
+        - center_* with * = center, north_west, north_east, south_west, south_east
+"""
 # Generate Network map based on defined parameters
 import math
 import random
 import csv
 from os.path import exists as file_exists
 
-
 # Number of network nodes
 iNodes = 50
 
 # Distances in meters
-minDistance = 300
+minDistance = 50
 networkX = 3000
 networkY = 3000
 
@@ -73,20 +80,26 @@ for i in range(1, iNodes+1):
 
 # Store Nodes on csv file for later use
 file_itr = 0
-fileName = "networkMap/networkMap_n{}_min{}_area{}x{}_id{}.txt"\
+fileName = "networkMap/networkMap_n{}_min{}_area{}x{}_id{}.csv"\
     .format(iNodes, minDistance, networkX, networkY, file_itr)
 
 # change id until file doesn't exist to prevent overwriting existing networkMaps
 while file_exists(fileName):
     file_itr += 1
-    fileName = "networkMap/networkMap_n{}_min{}_area{}x{}_id{}.txt"\
+    fileName = "networkMap/networkMap_n{}_min{}_area{}x{}_id{}.csv"\
         .format(iNodes, minDistance, networkX, networkY, file_itr)
 
-with open(fileName, mode="w", encoding="utf-8") as file:
+with open(fileName, mode="w", newline='') as csvfile:
+    csvWriter = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    # csvWriter.writerow(['ID'] + ['x'] + ['y'])
+    csvWriter.writerow(['ID', 'x', 'y'])
     for i in nodes:
-        file.write("{};{};{}\n".format(nodes[i].id, nodes[i].x, nodes[i].y))
+        csvWriter.writerow([nodes[i].id, nodes[i].x, nodes[i].y])
+        # file.write("{};{};{}\n".format(nodes[i].id, nodes[i].x, nodes[i].y))
 
-with open(fileName, encoding="utf-8") as file:
-    print(file.read())
+with open(fileName, newline='') as csvfile:
+    csvReader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+    for row in csvReader:
+        print(row)
 
-print(file.closed)
+print(csvfile.closed)
