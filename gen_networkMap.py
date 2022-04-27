@@ -4,6 +4,10 @@
     - Sink placement on these different ways needed:
         - border_* with * = north, east, south, west
         - center_* with * = center, north_west, north_east, south_west, south_east
+    - Add PathLoss calculation for link PDR and Range of neighbors
+        - Add SF for base max range of topology, each node keeps list of neighbors in max range
+        - Add Distance to each neighbor in range (easy to use for scaling)
+        - Add PDR % calculation to each neighbor in range (use P2P PathLoss model from Gilles)
 """
 # Generate Network map based on defined parameters
 import math
@@ -19,6 +23,12 @@ iNodes = 200
 minDistance = 100
 networkX = 3000
 networkY = 3000
+
+# SF parameter
+SF = 7
+
+# PathLoss parameters
+environmentFactor = 3
 
 # Should I do this with databases for later statistics?
 # Let's do it with an object for now
