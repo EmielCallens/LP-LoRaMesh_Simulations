@@ -9,7 +9,7 @@ import csv
 from lib import nodes
 # import for gui development
 from tkinter import *
-from tkinter import ttk
+# from tkinter import ttk
 
 # import for graph plotting -  why is this not included?
 # import matplotlib.pyplot as plt
@@ -23,7 +23,6 @@ with open(file_networkMap, newline='') as csvfile:
     for row in csvReader:
         # print(row['id'], row['x'], row['y'])
         dict_networkNodes[row['id']] = nodes.NetworkNode(row['id'], float(row['x']), float(row['y']))
-        print(dict_networkNodes[row['id']].id, dict_networkNodes[row['id']].x, dict_networkNodes[row['id']].y)
 
 # Read simulationData file
 """
@@ -33,7 +32,7 @@ root = Tk()
 
 
 class Topology:
-    def __init__(self, root, coordinates={}, filename_map="", width=500, height=500):
+    def __init__(self, root, coordinates, filename_map="", width=500, height=500):
         self.entry_value = StringVar(root, value="")
         self.__coordinates = coordinates
         self.__filename_map = filename_map
@@ -43,13 +42,10 @@ class Topology:
         root.title("Topology")
         root.geometry("{}x{}".format(self.__width, self.__height))
         root.resizable(width=False, height=False)
-        self.__labels_dot = {}
-        self.__labels_id = {}
         self.__lines = {}
         self.__canvas = Canvas(root, width=self.__width, height=self.__height)
         self.__canvas.pack()
         self.draw_map()
-
 
     def scale_coordinates(self):
         # Calculate Scale from area to px(screen size)
@@ -64,25 +60,23 @@ class Topology:
         for i in self.__coordinates:
             scaled_dict[i] = nodes.NetworkNode(i, float(self.__coordinates[i].x) / scale['x'],
                                                float(self.__coordinates[i].y) / scale['y'])
-            print(scaled_dict[i].id, scaled_dict[i].x, scaled_dict[i].y)  # For debug
         return scaled_dict, scale
 
     def draw_map(self):
         for c in self.__coordinates:
             # Node Location Dot
             label_dot = Label(root, text="O")
-            self.__labels_dot[c]= label_dot.place(x=self.__coordinates_scaled[c].x, y=self.__coordinates_scaled[c].y)
+            label_dot.place(x=self.__coordinates_scaled[c].x, y=self.__coordinates_scaled[c].y)
             label_dot.bind("<Button>", lambda event, a=self.__coordinates_scaled[c].id: self.draw_links(a))
             # Node ID Tag
             label_id = Label(root, text=self.__coordinates_scaled[c].id)
-            self.__labels_id[c]= label_id.place(x=self.__coordinates_scaled[c].x - 15.0, y=self.__coordinates_scaled[c].y - 10.0)
+            label_id.place(x=self.__coordinates_scaled[c].x - 15.0, y=self.__coordinates_scaled[c].y - 10.0)
 
     def draw_links(self, node_id):
         self.clear_shapes(self.__lines)
         temp_range = 500  # Need to get the real range for SF7 with certain Ptx settings
         x = self.__coordinates[node_id].x
         y = self.__coordinates[node_id].y
-        print(node_id, x, y)
         for c in self.__coordinates:
             delta_x = self.__coordinates[c].x - x
             delta_y = self.__coordinates[c].y - y
