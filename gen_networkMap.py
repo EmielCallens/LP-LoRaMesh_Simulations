@@ -15,12 +15,14 @@ import random
 import csv
 from os.path import exists as file_exists
 from lib import nodes
+from lib import param
+
 
 # Number of network nodes
 iNodes = 200
 
 # Distances in meters
-minDistance = 100
+maxDistance = 400
 networkX = 3000
 networkY = 3000
 
