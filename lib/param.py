@@ -83,6 +83,7 @@ class DataRate:
         self.__sf = str(sf)
         self.__sr = 0  # symbol-rate of SF setting in [symbol/s]
         self.__dr = 0  # data-rate of SF setting in [bit/s]
+        self.bw = 250000  # bandwidth same for all simulations
 
         if self.__sf == '6':
             self.__sr = self.bw / (2 ** 6)  # 3906.25
