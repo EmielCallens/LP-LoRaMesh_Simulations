@@ -147,7 +147,7 @@ class PayloadToa:
 
 # Preamble Time-on-air
 class PreambleToa:
-    def __init__(self, sf='', n=6 ):
+    def __init__(self, sf='', n=6):
         self.__sf = str(sf)
         self.__n = 6
         self.__toa = 0
