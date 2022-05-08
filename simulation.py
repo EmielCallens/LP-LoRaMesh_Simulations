@@ -5,8 +5,8 @@ from lib import nodes
 SimDuration = 24 * 60 * 60 * 1000 * 1000  # Simulation time in microseconds
 SimTime = 0  # Active loop time in microseconds
 
-# Read networkMap file
-file_networkMap = "networkMap/networkMap_n50_min100_area3000x3000_id0.csv"
+# Read networkTopology file
+file_networkMap = "networkTopology/networkMap_n50_min100_area3000x3000_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')

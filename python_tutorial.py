@@ -442,6 +442,8 @@ class Calculator:
             self.number_entry.insert(0, solution)
 
     def __init__(self, root):
+        self.__test = 0
+        self.test2 = 1
         self.entry_value = StringVar(root, value="")
         root.title("Calculator")
         root.geometry("600x250")
@@ -478,6 +480,7 @@ root = Tk()
 calc = Calculator(root)
 # Run the app until exited
 root.mainloop()
+
 
 
 

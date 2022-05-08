@@ -15,8 +15,8 @@ from tkinter import *
 # import matplotlib.pyplot as plt
 # import numpy as np
 
-# Read networkMap file
-file_networkMap = "networkMap/networkMap_n50_min100_area3000x3000_id0.csv"
+# Read networkTopology file
+file_networkMap = "networkTopology/networkMap_n50_min100_area3000x3000_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
