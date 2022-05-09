@@ -19,7 +19,7 @@ from lib.param import ParamTopology as ParamT
 
 
 # Number of network nodes
-iNodes = 10
+iNodes = 50
 standardSF = 7  # Used to calculate min range to at least one neighbor node
 standardPtx = 13
 standardEnvironment = 'urban'
@@ -66,7 +66,7 @@ for i in dict_nodes:
         distance_direct = math.sqrt(distance_x ** 2 + distance_y ** 2)
 
         if distance_direct <= maxDistance and i != j:
-            dict_nodes[i].neighbors = dict_nodes[i].link_pl([i, distance_direct])
+            dict_nodes[i].neighbors[j] = dict_nodes[i].link_pl(distance_direct)
 
 # Store Nodes with Path-loss information in a csv file for later use
 file_itr = 0
@@ -84,27 +84,28 @@ with open(fileName, mode="w", newline='') as csvfile:
     range_sf = ParamT.sf()
     range_ptx = ParamT.ptx()
     range_env = ParamT.env()
-    for i in range_sf:
-        print('test1')
-        for j in range_ptx:
-            print('test2')
-            for k in range_env:
-                print('test3')
-                message = 'neighbors_sf{}_ptx{}_{}'.format(range_sf[i], range_ptx[j], range_env[k])
-                print(message)
-                fieldnames.append()
-
-    print(fieldnames)
+    for sf in range_sf:
+        for ptx in range_ptx:
+            for env in range_env:
+                message = 'sf{}_ptx{}_{}'.format(sf, ptx, env)
+                fieldnames.append(message)
 
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     writer.writeheader()
+
     for i in dict_nodes:
-        writer.writerow({
-            'id': dict_nodes[i].id, 
-            'x': dict_nodes[i].x, 
-            'y': dict_nodes[i].y,
-            'neighbors': dict_nodes[i].neighbors
-        })
+        dict_row = {'id': dict_nodes[i].id, 'x': dict_nodes[i].x, 'y': dict_nodes[i].y}
+        for sf in range_sf:
+            for ptx in range_ptx:
+                for env in range_env:
+                    field = 'sf{}_ptx{}_{}'.format(sf, ptx, env)
+                    text = {}
+                    for neighbor in dict_nodes[i].neighbors:
+                        text[neighbor] = dict_nodes[i].neighbors[neighbor][sf][ptx][env]
+
+                    dict_row[field] = ';'.join([f'{key}:{value}' for key, value in text.items()])
+
+        writer.writerow(dict_row)
 
 with open(fileName, newline='') as csvfile:
     reader = csv.DictReader(csvfile, delimiter=',', quotechar='|')

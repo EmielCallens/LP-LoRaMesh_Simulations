@@ -3,12 +3,19 @@
 Possible extension later to show network traffic data after simulation
     - Add what links are used and amount of packages send and lost over this link
     - Add Energy used value of each node
+
 """
 import math
 import csv
 from lib import nodes
 # import for gui development
 from tkinter import *
+from lib.param import ParamTopology as ParamT
+from setup import Sim1 as Sim
+
+# Global variables
+range90 = ParamT.range90()[7][13]['urban']
+
 # from tkinter import ttk
 
 # import for graph plotting -  why is this not included?
@@ -16,13 +23,18 @@ from tkinter import *
 # import numpy as np
 
 # Read networkTopology file
-file_networkMap = "networkTopology/networkMap_n50_min100_area3000x3000_id0.csv"
+file_networkMap = "networkTopology/n50_sf7_area3000x3000_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
     for row in csvReader:
         # print(row['id'], row['x'], row['y'])
-        dict_networkNodes[row['id']] = nodes.NetworkNode(row['id'], float(row['x']), float(row['y']))
+        dict_networkNodes[row['id']] = nodes.NetworkNode(row['id'],
+                                                         float(row['x']),
+                                                         float(row['y']))
+        # need to add reading of neighbor file, only add for relevant Sim settings
+        # Probably need to add a declaration part to include neighbor into init van NetworkNodes.
+
 
 # Read simulationData file
 """
@@ -38,11 +50,15 @@ class Topology:
         self.__filename_map = filename_map
         self.__width = int(width)
         self.__height = int(height)
-        self.__coordinates_scaled, self.__scale = self.scale_coordinates()
+        self.__width_padding = 20  # extra screen padding on all borders to prevent cut off nodes at the border
+        self.__height_padding = 20
+        self.__width_info = 200  # extra screen on right (x) only to display network information
+        self.__coordinates_scaled, self.__scale, self.__area = self.scale_coordinates()
         root.title("Topology")
         root.geometry("{}x{}".format(self.__width, self.__height))
         root.resizable(width=False, height=False)
         self.__lines = {}
+        self.__info = {}
         self.__canvas = Canvas(root, width=self.__width, height=self.__height)
         self.__canvas.pack()
         self.draw_map()
@@ -54,27 +70,38 @@ class Topology:
         index_id = self.__filename_map.index("_id")
         area_width = int(self.__filename_map[index_area + 4: index_x])
         area_height = int(self.__filename_map[index_x + 1: index_id])
-        scale = {'x': float(area_width / self.__width), 'y': float(area_height / self.__height)}
+        topo_screen_width = self.__width - self.__width_padding * 2 - self.__width_info
+        topo_screen_height = self.__height - self.__height_padding * 2
+        scale = {'x': float(area_width / topo_screen_width), 'y': float(area_height / topo_screen_height)}
+        area = {'x': area_width, 'y': area_height}
         # print(scale_width, scale_height)  # For debug
         scaled_dict = {}
         for i in self.__coordinates:
-            scaled_dict[i] = nodes.NetworkNode(i, float(self.__coordinates[i].x) / scale['x'],
-                                               float(self.__coordinates[i].y) / scale['y'])
-        return scaled_dict, scale
+            scaled_dict[i] = nodes.NetworkNode(i,
+                                               (float(self.__coordinates[i].x) / scale['x']) + self.__width_padding,
+                                               (float(self.__coordinates[i].y) / scale['y']) + self.__width_padding)
+        return scaled_dict, scale, area
 
     def draw_map(self):
         for c in self.__coordinates:
             # Node Location Dot
             label_dot = Label(root, text="O")
-            label_dot.place(x=self.__coordinates_scaled[c].x, y=self.__coordinates_scaled[c].y)
+            label_dot.place(x=self.__coordinates_scaled[c].x, y=self.__coordinates_scaled[c].y, anchor=CENTER)
             label_dot.bind("<Button>", lambda event, a=self.__coordinates_scaled[c].id: self.draw_links(a))
             # Node ID Tag
             label_id = Label(root, text=self.__coordinates_scaled[c].id)
-            label_id.place(x=self.__coordinates_scaled[c].x - 15.0, y=self.__coordinates_scaled[c].y - 10.0)
+            label_id.place(x=self.__coordinates_scaled[c].x + 15.0, y=self.__coordinates_scaled[c].y - 10.0,
+                           anchor=CENTER)
+
+        # Draw network area outline scaled on screen
+        x_start_point = (0 / self.__scale['x']) + self.__width_padding
+        x_end_point = (self.__area['x'] / self.__scale['x']) + self.__width_padding
+        y_start_point = (0 / self.__scale['y']) + self.__width_padding
+        y_end_point = (self.__area['x'] / self.__scale['y']) + self.__width_padding
+        self.__canvas.create_rectangle(x_start_point, y_start_point, x_end_point, y_end_point)
 
     def draw_links(self, node_id):
         self.clear_shapes(self.__lines)
-        temp_range = 500  # Need to get the real range for SF7 with certain Ptx settings
         x = self.__coordinates[node_id].x
         y = self.__coordinates[node_id].y
         for c in self.__coordinates:
@@ -82,14 +109,30 @@ class Topology:
             delta_y = self.__coordinates[c].y - y
             distance = math.sqrt(delta_x ** 2 + delta_y ** 2)
             # Draw Line
-            if distance <= temp_range and distance != 0:
+            if distance <= range90 and distance != 0:
                 # print("draw line", x/self.__scale['x'], y/self.__scale['y'],
                 #   self.__coordinates_scaled[c].x, self.__coordinates_scaled[c].y)
                 # Canvas.create_line(x1,y1,x2,y2, fill='color', dash=(4, 2))
-                self.__lines[c] = self.__canvas.create_line(float(x / self.__scale['x'] + 10.0),
-                                                            float(y / self.__scale['y'] + 10),
-                                                            self.__coordinates_scaled[c].x + 10.0,
-                                                            self.__coordinates_scaled[c].y + 10)
+                self.__lines[c] = self.__canvas.create_line(float(x / self.__scale['x']) + self.__width_padding,
+                                                            float(y / self.__scale['y']) + self.__height_padding,
+                                                            self.__coordinates_scaled[c].x,
+                                                            self.__coordinates_scaled[c].y)
+        self.draw_node_info(node_id)
+
+    def draw_node_info(self, node_id):
+        self.clear_shapes(self.__info)
+        # List PER % of each link
+        y_start = self.__height_padding + 10
+        x_start = self.__width - self.__width_info
+        self.__info['self'] = self.__canvas.create_text(x_start, y_start,
+                                                        font="Times 11",
+                                                        text="ID:{}".format(node_id))
+
+        for i in dict_networkNodes[node_id].neighbors:
+            print(dict_networkNodes[node_id].neighbors, i)
+            self.__info[i] = self.__canvas.create_text(x_start, y_start,
+                                                       font="Times 11",
+                                                       text="ID:{}".format(i))
 
     def clear_shapes(self, dict_shapes):
         for shape in dict_shapes:

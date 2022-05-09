@@ -9,20 +9,25 @@ class ParamTopology:
         return 250000
     @staticmethod
     def sf():
-        return [6, 7, 8, 9, 10, 11, 12]
+        # return [6, 7, 8, 9, 10, 11, 12]
+        return [7]
     @staticmethod
     def ptx():
-        return [7, 13, 17, 20]
+        # return [7, 13, 17, 20]
+        return [13]
     @staticmethod
     def env():
-        return ['urban', 'forest', 'coast']
+        #return ['urban', 'forest', 'coast']
+        return['urban']
 
     @staticmethod
     def gain_tx():
-        return {7: 7, 13: 13, 17: 17, 20: 20}
+        # return {7: 7, 13: 13, 17: 17, 20: 20}
+        return {13: 13}
     @staticmethod
     def gain_rx():
-        return {6: -115, 7: -120, 8: -123, 9: -125, 10: -128, 11: -130, 12: -133}  # {SF dependant rx sensitivity}
+        # return {6: -115, 7: -120, 8: -123, 9: -125, 10: -128, 11: -130, 12: -133}  # {SF dependant rx sensitivity}
+        return {7: -120}
 
     @staticmethod
     def env_pl0():
