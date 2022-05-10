@@ -12,9 +12,11 @@ from lib import nodes
 from tkinter import *
 from lib.param import ParamTopology as ParamT
 from setup import Sim1 as Sim
+from lib.nodes import NetworkNode
 
 # Global variables
-range90 = ParamT.range90()[7][13]['urban']
+
+range90 = ParamT.range90()[Sim.sf()][Sim.ptx()][Sim.env()]
 
 # from tkinter import ttk
 
@@ -28,10 +30,13 @@ dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
     for row in csvReader:
-        # print(row['id'], row['x'], row['y'])
-        dict_networkNodes[row['id']] = nodes.NetworkNode(row['id'],
-                                                         float(row['x']),
-                                                         float(row['y']))
+        text_links = row['sf{}_ptx{}_{}'.format(Sim.sf(), Sim.ptx(), Sim.env())]
+        dict_links = NetworkNode.unpack_links([text_links, Sim.sf(), Sim.ptx(), Sim.env()])
+        dict_networkNodes[row['id']] = NetworkNode(row['id'],
+                                                   float(row['x']),
+                                                   float(row['y']),
+                                                   dict_links)
+
         # need to add reading of neighbor file, only add for relevant Sim settings
         # Probably need to add a declaration part to include neighbor into init van NetworkNodes.
 
@@ -110,9 +115,6 @@ class Topology:
             distance = math.sqrt(delta_x ** 2 + delta_y ** 2)
             # Draw Line
             if distance <= range90 and distance != 0:
-                # print("draw line", x/self.__scale['x'], y/self.__scale['y'],
-                #   self.__coordinates_scaled[c].x, self.__coordinates_scaled[c].y)
-                # Canvas.create_line(x1,y1,x2,y2, fill='color', dash=(4, 2))
                 self.__lines[c] = self.__canvas.create_line(float(x / self.__scale['x']) + self.__width_padding,
                                                             float(y / self.__scale['y']) + self.__height_padding,
                                                             self.__coordinates_scaled[c].x,
@@ -122,17 +124,19 @@ class Topology:
     def draw_node_info(self, node_id):
         self.clear_shapes(self.__info)
         # List PER % of each link
-        y_start = self.__height_padding + 10
+        y_start = self.__height_padding + 15
         x_start = self.__width - self.__width_info
         self.__info['self'] = self.__canvas.create_text(x_start, y_start,
                                                         font="Times 11",
-                                                        text="ID:{}".format(node_id))
-
-        for i in dict_networkNodes[node_id].neighbors:
-            print(dict_networkNodes[node_id].neighbors, i)
+                                                        text="ID:{}".format(node_id),
+                                                        anchor=SW)
+        dict_pers = dict_networkNodes[node_id].neighbors
+        for i in dict_pers:
+            y_start += 15
             self.__info[i] = self.__canvas.create_text(x_start, y_start,
                                                        font="Times 11",
-                                                       text="ID:{}".format(i))
+                                                       text="ID: {} | PER: {}%".format(i, round(dict_pers[i]*100, 2)),
+                                                       anchor=SW)
 
     def clear_shapes(self, dict_shapes):
         for shape in dict_shapes:

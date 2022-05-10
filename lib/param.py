@@ -9,25 +9,25 @@ class ParamTopology:
         return 250000
     @staticmethod
     def sf():
-        # return [6, 7, 8, 9, 10, 11, 12]
-        return [7]
+        return [6, 7, 8, 9, 10, 11, 12]
+        # return [7]
     @staticmethod
     def ptx():
-        # return [7, 13, 17, 20]
-        return [13]
+        return [7, 13, 17, 20]
+        # return [13]
     @staticmethod
     def env():
-        #return ['urban', 'forest', 'coast']
-        return['urban']
+        return ['urban', 'forest', 'coast']
+        # return['urban']
 
     @staticmethod
     def gain_tx():
-        # return {7: 7, 13: 13, 17: 17, 20: 20}
-        return {13: 13}
+        return {7: 7, 13: 13, 17: 17, 20: 20}
+        # return {13: 13}
     @staticmethod
     def gain_rx():
-        # return {6: -115, 7: -120, 8: -123, 9: -125, 10: -128, 11: -130, 12: -133}  # {SF dependant rx sensitivity}
-        return {7: -120}
+        return {6: -115, 7: -120, 8: -123, 9: -125, 10: -128, 11: -130, 12: -133}  # {SF dependant rx sensitivity}
+        # return {7: -120}
 
     @staticmethod
     def env_pl0():
@@ -86,132 +86,110 @@ class ParamTopology:
             }
         }
 
+    @staticmethod
+    def range_payload_size():
+        return [50, 255]  # min 1, max 255
 
-# Power settings for Tx
-class PowerTx:
-    def __init__(self, power_type='0'):
-        self.__type = power_type
-        self.__mW = 0.0
-        self.sup_volt = 3.3
+    # All Power variables are expressed in mJoules (mA * V)
+    @staticmethod
+    def power_tx():
+        return {7: 20 * 3.3, 13: 29 * 3.3, 17: 90 * 3.3, 20: 120 * 3.3}  # using supply voltage 3.3V
 
-        if self.__type == '7':
-            self.__mW = 20 * self.sup_volt
+    @staticmethod
+    def power_rx():
+        return 11.1 * 1.5 * 3.3  # LnaBoost 150% current draw and 3.3V supply voltage
 
-        if self.__type == '13':
-            self.__mW = 29 * self.sup_volt
+    @staticmethod
+    def power_cad():
+        # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
+        return 11.1 * 1.5 * 3.3 * 0.75  # 3.3V supply voltage # *0.75 because second part of CAD only uses half
 
-        if self.__type == '17':
-            self.__mW = 90 * self.sup_volt
+    @staticmethod
+    def power_sleep():
+        # sleep power consumption SX1276
+        return 0.001 * 3.3  # 3.3V supply voltage
 
-        if self.__type == '20':
-            self.__mW = 120 * self.sup_volt
+    @staticmethod
+    def power_standby():
+        # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
+        return 1.8 * 3.3  # 3.3V supply voltage
 
-    @property
-    def mw(self):
-        return self.__mW
+    @staticmethod
+    def power_dramco():
+        # Idle DramcoUno power consumption
+        # 16.1 is worst case scenario for Atmega chip, might be more when using sensors...
+        # Maybe better to not include? after all power draw of sensors and DramcoUno can be considered constant.
+        return 16.1 * 5  # 5V supply voltage
 
+    @staticmethod
+    def symbol_rate():
+        return {
+            6: ParamTopology.bw() / (2 ** 6),  # 3906.25 symbols/second
+            7: ParamTopology.bw() / (2 ** 7),  # 1953.125
+            8: ParamTopology.bw() / (2 ** 8),  # 976.5625
+            9: ParamTopology.bw() / (2 ** 9),  # 488.28125
+            10: ParamTopology.bw() / (2 ** 10),  # 244.140625
+            11: ParamTopology.bw() / (2 ** 11),  # 122.0703125
+            12: ParamTopology.bw() / (2 ** 12)  # 61.03515625
+        }
 
-# Power settings for Rx
-class PowerRx:
-    def __init__(self, boost=True):
-        self.__type = boost
-        self.__mW = 11.1
+    @staticmethod
+    def symbol_time():
+        return {
+            6: 1000000 / ParamTopology.symbol_rate()[6],  # 256 microseconds/symbol
+            7: 1000000 / ParamTopology.symbol_rate()[7],  # 512
+            8: 1000000 / ParamTopology.symbol_rate()[8],  # 1024
+            9: 1000000 / ParamTopology.symbol_rate()[9],  # 2048
+            10: 1000000 / ParamTopology.symbol_rate()[10],  # 4096
+            11: 1000000 / ParamTopology.symbol_rate()[11],  # 8192
+            12: 1000000 / ParamTopology.symbol_rate()[12]  # 16384
+        }
 
-        if self.__type:
-            self.__mW = 11.1 * 1.5  # LnaBoost 150% current draw
+    @staticmethod
+    def bit_rate():
+        return{
+            6: 6 * ParamTopology.symbol_rate()[6],  # 23437.5 bit/second
+            7: 7 * ParamTopology.symbol_rate()[7],  # 13671.875
+            8: 8 * ParamTopology.symbol_rate()[8],  # 7812.5
+            9: 6 * ParamTopology.symbol_rate()[9],  # 4394.53125
+            10: 10 * ParamTopology.symbol_rate()[10],  # 2441.40625
+            11: 11 * ParamTopology.symbol_rate()[11],  # 1342.7734375
+            13: 12 * ParamTopology.symbol_rate()[12]  # 732.421875
+        }
 
-    @property
-    def mw(self):
-        return self.__mW
+    @staticmethod
+    def calc_payload_toa(value):
+        try:
+            payload_size, sf, header_type, crc, cr = value
+            payload_size = int(payload_size)
+            bw = ParamTopology.bw()
+            toa = 0
+            # header options
+            ih = 0  # standard for header_type explicit
+            if header_type == 'implicit':
+                ih = 1
+            # Low data rate optimization, only for SF12
+            de = 0
+            if sf == 12:
+                de = 1
 
+            # Calculate time-on-air of chosen packet length.
+            payload_sym = 8 + max(
+                math.ceil((8 * payload_size - 4 * int(sf) + 28 + 16 * crc - 20 * ih)
+                          / (4 * (int(sf) - 2 * de))) * (cr + 4), 0)
+            toa = payload_sym * ParamTopology.symbol_rate()[sf]
 
-# Data-rate settings
-class DataRate:
-    def __init__(self, sf=''):
-        self.__sf = str(sf)
-        self.__sr = 0  # symbol-rate of SF setting in [symbol/s]
-        self.__dr = 0  # data-rate of SF setting in [bit/s]
-        tmp_param = Param()
-        self.__bw = tmp_param.bw  # bandwidth same for all simulations
+            return toa
 
-        if self.__sf == '6':
-            self.__sr = self.__bw / (2 ** 6)  # 3906.25
-            self.__dr = 6 * self.__sr
+        except ValueError:
+            print("value does not contain [payload_size, sf, header_type, crc, cr]")
 
-        if self.__sf == '7':
-            self.__sr = self.__bw / (2 ** 7)  # 1953.125
-            self.__dr = 7 * self.__sr
+    @staticmethod
+    def calc_preamble_toa(value):
+        try:
+            preamble_size, sf = value
+            toa = (preamble_size + 4) * ParamTopology.symbol_rate()[sf]
 
-        if self.__sf == '8':
-            self.__sr = self.__bw / (2 ** 8)  # 976.5625
-            self.__dr = 8 * self.__sr
-
-        if self.__sf == '9':
-            self.__sr = self.__bw / (2 ** 9)  # 488.28125
-            self.__dr = 9 * self.__sr
-
-        if self.__sf == '10':
-            self.__sr = self.__bw / (2 ** 10)  # 244.140625
-            self.__dr = 10 * self.__sr
-
-        if self.__sf == '11':
-            self.__sr = self.__bw / (2 ** 11)  # 122.0703125
-            self.__dr = 11 * self.__sr
-
-        if self.__sf == '12':
-            self.__sr = self.__bw / (2 ** 12)  # 61.03515625
-            self.__dr = 12 * self.__sr
-
-    @property
-    def sr(self):
-        return self.__sr
-
-    @property
-    def dr(self):
-        return self.__dr
-
-
-# Payload Time-on-air
-class PayloadToa:
-    def __init__(self, payload_size=1, sf='7', header_type='explicit', crc=1, cr=4 / 5):
-        self.__payload_size = int(payload_size)
-        self.__sf = str(sf)
-        self.__header_type = header_type
-        tmp_param = Param()
-        self.__bw = tmp_param.bw
-        self.__cr = cr  # Coding Rate for payload.
-        self.__crc = crc  # 16-bit CRC for payload, optional (2bytes)
-        self.__toa = 0
-        # header options
-        if self.__header_type == 'explicit':
-            self.__ih = 0
-        else:
-            self.__ih = 0
-        # Low data rate optimization, only for SF12
-        if self.__sf == '12':
-            self.__de = 1
-        else:
-            self.__de = 0
-        # Calculate time-on-air of chosen packet length.
-        self.__payload_sym = self.__toa = 8 + max(
-            math.ceil((8 * self.__payload_size - 4 * int(sf) + 28 + 16 * self.__crc - 20 * self.__ih)
-                      / (4 * (int(self.__sf) - 2 * self.__de))) * (self.__cr + 4), 0)
-        self.__dataRate = DataRate(self.__sf)
-        self.__sr = self.__dataRate.sr
-        self.__toa = self.__payload_sym * self.__sr
-
-    @property
-    def toa(self):
-        return self.__toa
-
-
-# Preamble Time-on-air - Unfinished
-class PreambleToa:
-    def __init__(self, sf='', n=6):
-        self.__sf = str(sf)
-        self.__n = 6
-        self.__toa = 0
-
-    @property
-    def toa(self):
-        return self.__toa
+            return toa
+        except ValueError:
+            print("value does not contain [preamble_sizes, sf]")
