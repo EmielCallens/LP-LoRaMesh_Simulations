@@ -24,6 +24,8 @@ with open(file_networkMap, newline='') as csvfile:
         dict_networkNodes[row['id']] = NetworkNode(row['id'],
                                                    float(row['x']),
                                                    float(row['y']),
+                                                   int(row['drift']),
+                                                   int(row['activation']),
                                                    dict_links)
 
 # Create unique simulation folder and make setup.txt file to save setup.py settings used for simulation
@@ -54,27 +56,106 @@ file_setup.close()
 def switch_mode(node):
     new_mode = ''
     new_time = 0
+    new_time_drift = 0
     new_consumption = 0
-    new_leftover_time = 0
+    new_leftover_time = 0  # what do i use this for again?
+    leftover_cycle_time = 0
     # SLEEP
     if node.mode == 'SLEEP':
-        for s in Sim.idle_schedule():
-            if s == 'SLEEP':
-                new_mode = s
-            elif new_mode == 'SLEEP':
-                new_mode = s
-                new_time = Sim.idle_schedule()[s]
-                break
-    # RX
-    # RX_IDLE ends no preamble received during this duration
-    if node.mode == 'RX_IDLE':
-        for s in Sim.idle_schedule():
-            if s == 'SLEEP':
-                new_mode = s
-            elif new_mode == 'SLEEP':
-                new_mode = s
-                new_time = Sim.idle_schedule()[s]
-                break
+        # Wake Up - No Transmission
+        if len(node.buffer) == 0:
+            if Sim.detection_mode() == 'RX':
+                new_mode = 'start_RX'
+                new_time = ParamT.time_osc() + ParamT.time_fs()
+                new_time_drift = new_time + new_time / (node.clock_drift * 10**6)
+            if Sim.detection_mode() == 'CAD':
+                new_mode = 'start_RX'
+                new_time = ParamT.time_osc() + ParamT.time_fs()
+                new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+        # Wake Up - Prepare transmit
+        else:
+            new_mode = 'STANDBY_TX'
+            new_time = Sim.spi_payload(node.buffer[0].payload)
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+    # start_STANDBY
+    # STANDBY_load_TX
+    # start_CAD
+    # CAD
+    # start_RX
+    if node.mode == 'start_RX':
+        new_mode = 'RX_sync'
+        new_time = Sim.time_rx_sync()
+        new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+    # RX_sync
+    if node.mode == 'RX_sync':
+        # No preamble at receiver
+        if len(node.recv_preamble) == 0:
+            new_mode = 'RX_timeout'
+            new_time = Sim.time_rx_sync()
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+        # 1 preamble at receiver no data transmission active to collide.
+        if len(node.recv_preamble) == 1 and len(node.recv_payload) == 0:
+            new_mode = 'RX_preamble'
+            # set to max time preamble + word but will be cut short by transmitter when it changes to payload
+            new_time = Sim.time_preamble() + ParamT.time_syncword(Sim.sf())
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+        # Collision at receiver
+        if len(node.recv_preamble) + len(node.recv_payload) > 1:
+            new_mode = 'RX_timeout'
+            new_time = Sim.time_rx_sync()
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+    # RX_preamble
+    # Should never end, transmitter should always end it
+    # when transmitter ends it the RX_sync starts
+    print("error RX_preamble mode ended")
+
+    # RX_word
+    if node.mode == 'RX_sync':
+        new_mode = 'RX_header'
+        new_time = Sim.time_rx_header()
+        new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+    # RX_header
+    if node.mode == 'RX_header':
+        # Broadcast protocols have no address filtering
+        if Sim.target() == 'broadcast':
+            new_mode = 'RX_payload'
+            new_time = Sim.time_rx_payload() + 1000  # 1000 to avoid it from ending before transmitter
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+        # Targeted protocols with address
+        else:
+            new_mode = 'RX_address'
+            new_time = Sim.time_rx_address() + Sim.time_reg_read_address()
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+    # RX_address
+    if node.mode == 'RX_address':
+        # Address set to true, means continue to receive payload
+        if node.recv_address == node.node_id:
+            new_mode = 'RX_payload'
+            new_time = Sim.time_rx_payload()
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+        # Address false
+        else:
+            new_mode = 'SLEEP'
+            # Do this tomorrow, handling sleep is difficult,
+            # needs to keep in mind the cycle and spi Tx preparation
+            new_time = Sim.time_rx_payload()
+            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+
+    # RX_payload
+    # RX_timeout
+    # TX_preamble
+    # TX_payload
+
+
     # RX_HEAR ends and preamble is still going
     if node.mode == 'RX_HEAR' and node.overhear_preamble == 1:
         new_mode = 'RX_REC'
@@ -104,8 +185,10 @@ def switch_mode(node):
         new_consumption = ParamT.power_tx()[Sim.sf()] * new_time  # mW * second = mJ
 
     node.mode = new_mode
+    node.mode_time_drift = new_time_drift
     node.mode_time = new_time
-    node.mode_leftover_time = new_leftover_time
+    #node.mode_leftover_time = new_leftover_time
+   # node.cycle_time = leftover_cycle_time
     node.consumption += new_consumption
     return node
 
@@ -126,53 +209,80 @@ def calc_e_factor():
 # set nodes in initial start position
 dict_simNodes = {}
 for i in dict_networkNodes:
-    dict_simNodes[i] = SimNode(i, dict_networkNodes[i].neighbors)
+    dict_simNodes[i] = SimNode(i,
+                               dict_networkNodes[i].clock_drift,
+                               dict_networkNodes[i].activation_time,
+                               dict_networkNodes[i].neighbors
+                               )
 
 # Simulation Loop
 sim_cycle = 0
+previous_print = 0
+hour_log = 0
 while simTime <= simRuntime:
-    delta_time = simRuntime-simTime  # max time to go as start of delta time this loop
+    delta_time = simRuntime - simTime  # max time to go as start of delta time this loop
     list_actions = []  # list of nodes that have an action this loop
     # Time management
     for i in dict_simNodes:
         if dict_simNodes[i].mode_time < delta_time:
+            # look for lowest value delta_time in global time
             delta_time = dict_simNodes[i].mode_time
+
     for i in dict_simNodes:
-        if dict_simNodes[i].mode_time == delta_time:
+        # Add all nodes where mode_time ended to action list
+        if dict_simNodes[i].mode_time <= delta_time:
             list_actions.append(i)
-        dict_simNodes[i].mode_time -= delta_time  # subtract loop time period from all mode_times
+
+        # Change passed network time to passed node time
+        delta_time_drift = delta_time + delta_time / (dict_simNodes[i].clock_drift * 10 ** 6)
+
+        # Mode Time (external, network time)
+        dict_simNodes[i].mode_time -= delta_time
+
+        # Mode Time Drift (internal)
+        dict_simNodes[i].mode_time_drift -= delta_time_drift
+
+        # Add node clock (internal)
+        dict_simNodes[i].internal_clock += delta_time_drift
+
+        # Cycle Time (internal)
+        if dict_simNodes[i].cycle_time - delta_time_drift <= 0:
+            dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
+        else:
+            dict_simNodes[i].cycle_time -= delta_time_drift  # subtract loop time period from all cycle_times
+
+    # Add time to network clock
     simTime += delta_time
 
     # Action management
-    # Diff modes: SLEEP, CAD, RX, CAD_Rx, PRE_TX, TX
+    # Diff modes: SLEEP, start_STANDBY, STANDBY_load_TX, STANDBY, start_CAD, CAD
+    # start_RX, RX_sync, RX_preamble, RX_word, RX_header, RX_address RX_payload, RX_timeout, TX_preamble, TX_payload
     # Finish Mode
     for i in list_actions:
-        if dict_simNodes[i].mode == 'SLEEP':
-            print("end SLEEP procedure")
-            # Set new mode
-            dict_simNodes[i] = switch_mode(dict_simNodes[i])
+        print('Old mode', i.mode)
+        print('Old mode', i.mode)
 
+        dict_simNodes[i] = switch_mode(i)
 
-        if dict_simNodes[i].mode == 'CAD':
-            print("end CAD procedure")
+        print('New mode', dict_simNodes[i].mode)
+        print('New time', dict_simNodes[i].mode_time)
 
-        if dict_simNodes[i].mode == 'CAD_RX':
-            print("end CAD_RX procedure")
-
-        if dict_simNodes[i].mode == 'RX_IDLE':
-            print("end RX procedure")
-
-        if dict_simNodes[i].mode == 'RX_REC':
-            print("end RX procedure")
-
-        if dict_simNodes[i].mode == 'PRE_TX':
-            print("end PRE_TX procedure")
-
-        if dict_simNodes[i].mode == 'TX':
-            print("start TX procedure")
+    # Hourly Log Management
+    if hour_log >= 60 * 60 * 10**6:
+        hour_log = 0
+        # Open Network file and save hour data
+        # Open Node files and save hour data
+        # For debug
+        print("One Hour passed, Log Data")
 
     # Increase timer by microseconds to next network action and print node actions to individual Log
     sim_cycle += 1
+
+    # print progress for debug
+    if simTime - previous_print >= 1 * 10**6:
+        print("Sim Cycle:", sim_cycle, " ", round(simTime / simRuntime), "%")
+        previous_print = simTime
+
 
 
 

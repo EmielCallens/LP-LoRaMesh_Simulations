@@ -86,10 +86,6 @@ class ParamTopology:
             }
         }
 
-    @staticmethod
-    def range_payload_size():
-        return [50, 255]  # min 1, max 255
-
     # All Power variables are expressed in mJoules (mA * V)
     @staticmethod
     def power_tx():
@@ -98,11 +94,6 @@ class ParamTopology:
     @staticmethod
     def power_rx():
         return 11.1 * 1.5 * 3.3  # LnaBoost 150% current draw and 3.3V supply voltage
-
-    @staticmethod
-    def power_cad():
-        # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
-        return 11.1 * 1.5 * 3.3 * 0.75  # 3.3V supply voltage # *0.75 because second part of CAD only uses half
 
     @staticmethod
     def power_sleep():
@@ -115,6 +106,43 @@ class ParamTopology:
         return 1.8 * 3.3  # 3.3V supply voltage
 
     @staticmethod
+    def time_cad_rx():
+        # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
+        return {6: 384, 7: 640, 8: 1152, 9: 2176, 10: 4224, 11: 8320, 12: 16512}  # in µs
+    @staticmethod
+    def time_cad_process():
+        # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
+        return {6: 192, 7: 343, 8: 681, 9: 1408, 10: 3067, 11: 6508, 12: 13962}  # in µs
+    @staticmethod
+    def power_cad():
+        return {'RX': 12.4 * 3.3, 'Process': 6.8 * 3.3}  # 3.3V supply voltage
+    @staticmethod
+    def consumption_cad():
+        # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
+        return {6: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[6] / 10**-6) +
+                   (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[6] / 10**-6),
+                # 0.020022 mJ
+                7: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[7] / 10**-6) +
+                   (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[7] / 10**-6),
+                # 0.033886 mJ
+                8: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[8] / 10**-6) +
+                   (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[8] / 10**-6),
+                # 0.062421 mJ
+                9: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[9] / 10**-6) +
+                   (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[9] / 10**-6),
+                # 0.120637 mJ
+                10: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[10] / 10**-6) +
+                    (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[10] / 10**-6),
+                # 0.24167 mJ
+                11: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[11] / 10**-6) +
+                    (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[11] / 10**-6),
+                # 0.486494 mJ
+                12: (ParamTopology.power_cad()['RX'] * ParamTopology.time_cad_rx()[12] / 10**-6) +
+                    (ParamTopology.power_cad()['Process'] * ParamTopology.time_cad_process()[12] / 10**-6)
+                # 0.988978 mJ
+                }
+
+    @staticmethod
     def power_dramco():
         # Idle DramcoUno power consumption
         # 16.1 is worst case scenario for Atmega chip, might be more when using sensors...
@@ -122,7 +150,7 @@ class ParamTopology:
         return 16.1 * 5  # 5V supply voltage
 
     @staticmethod
-    def symbol_rate():
+    def rate_symbol():
         return {
             6: ParamTopology.bw() / (2 ** 6),  # 3906.25 symbols/second
             7: ParamTopology.bw() / (2 ** 7),  # 1953.125
@@ -134,50 +162,64 @@ class ParamTopology:
         }
 
     @staticmethod
-    def symbol_time():
+    def time_symbol():
         return {
-            6: 1000000 / ParamTopology.symbol_rate()[6],  # 256 microseconds/symbol
-            7: 1000000 / ParamTopology.symbol_rate()[7],  # 512
-            8: 1000000 / ParamTopology.symbol_rate()[8],  # 1024
-            9: 1000000 / ParamTopology.symbol_rate()[9],  # 2048
-            10: 1000000 / ParamTopology.symbol_rate()[10],  # 4096
-            11: 1000000 / ParamTopology.symbol_rate()[11],  # 8192
-            12: 1000000 / ParamTopology.symbol_rate()[12]  # 16384
+            6: 1000000 / ParamTopology.rate_symbol()[6],  # 256 microseconds/symbol
+            7: 1000000 / ParamTopology.rate_symbol()[7],  # 512
+            8: 1000000 / ParamTopology.rate_symbol()[8],  # 1024
+            9: 1000000 / ParamTopology.rate_symbol()[9],  # 2048
+            10: 1000000 / ParamTopology.rate_symbol()[10],  # 4096
+            11: 1000000 / ParamTopology.rate_symbol()[11],  # 8192
+            12: 1000000 / ParamTopology.rate_symbol()[12]  # 16384
         }
 
     @staticmethod
-    def bit_rate():
+    def rate_bit():
         return{
-            6: 6 * ParamTopology.symbol_rate()[6],  # 23437.5 bit/second
-            7: 7 * ParamTopology.symbol_rate()[7],  # 13671.875
-            8: 8 * ParamTopology.symbol_rate()[8],  # 7812.5
-            9: 6 * ParamTopology.symbol_rate()[9],  # 4394.53125
-            10: 10 * ParamTopology.symbol_rate()[10],  # 2441.40625
-            11: 11 * ParamTopology.symbol_rate()[11],  # 1342.7734375
-            13: 12 * ParamTopology.symbol_rate()[12]  # 732.421875
+            6: 6 * ParamTopology.rate_symbol()[6],  # 23437.5 bit/second
+            7: 7 * ParamTopology.rate_symbol()[7],  # 13671.875
+            8: 8 * ParamTopology.rate_symbol()[8],  # 7812.5
+            9: 6 * ParamTopology.rate_symbol()[9],  # 4394.53125
+            10: 10 * ParamTopology.rate_symbol()[10],  # 2441.40625
+            11: 11 * ParamTopology.rate_symbol()[11],  # 1342.7734375
+            13: 12 * ParamTopology.rate_symbol()[12]  # 732.421875
         }
 
     @staticmethod
-    def calc_payload_toa(value):
+    def n_payload_calc(value):
         try:
-            payload_size, sf, header_type, crc, cr = value
+            payload_size, sf, ih, crc, de, cr = value
             payload_size = int(payload_size)
             bw = ParamTopology.bw()
             toa = 0
-            # header options
-            ih = 0  # standard for header_type explicit
-            if header_type == 'implicit':
-                ih = 1
-            # Low data rate optimization, only for SF12
-            de = 0
-            if sf == 12:
-                de = 1
 
             # Calculate time-on-air of chosen packet length.
             payload_sym = 8 + max(
                 math.ceil((8 * payload_size - 4 * int(sf) + 28 + 16 * crc - 20 * ih)
                           / (4 * (int(sf) - 2 * de))) * (cr + 4), 0)
-            toa = payload_sym * ParamTopology.symbol_rate()[sf]
+
+            return payload_sym
+
+        except ValueError:
+            print("value does not contain [payload_size, sf, ih, crc, de, cr]")
+
+    @staticmethod
+    def n_syncword():
+        return 4.25
+
+    @staticmethod
+    def toa_payload_calc(value):
+        try:
+            payload_size, sf, ih, crc, de, cr = value
+            payload_size = int(payload_size)
+            bw = ParamTopology.bw()
+            toa = 0
+
+            # Calculate time-on-air of chosen packet length.
+            payload_sym = 8 + max(
+                math.ceil((8 * payload_size - 4 * int(sf) + 28 + 16 * crc - 20 * ih)
+                          / (4 * (int(sf) - 2 * de))) * (cr + 4), 0)
+            toa = payload_sym * ParamTopology.rate_symbol()[sf]
 
             return toa
 
@@ -185,11 +227,39 @@ class ParamTopology:
             print("value does not contain [payload_size, sf, header_type, crc, cr]")
 
     @staticmethod
-    def calc_preamble_toa(value):
+    def toa_preamble_calc(value):
         try:
             preamble_size, sf = value
-            toa = (preamble_size + 4) * ParamTopology.symbol_rate()[sf]
+            toa = preamble_size * ParamTopology.rate_symbol()[sf]
 
             return toa
         except ValueError:
             print("value does not contain [preamble_sizes, sf]")
+
+    @staticmethod
+    def time_syncword(value):
+        try:
+            sf = value
+            toa = 4.25 * ParamTopology.rate_symbol()[sf]
+
+            return toa
+        except ValueError:
+            print("value does not contain [sf]")
+
+    @staticmethod
+    def time_osc():
+        return 250
+
+    @staticmethod
+    def time_fs():
+        return 60
+
+    @staticmethod
+    def time_hop():
+        return 20
+
+    @staticmethod
+    def n_rx_sync():
+        return 2
+
+

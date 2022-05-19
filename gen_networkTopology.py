@@ -19,7 +19,7 @@ from lib.param import ParamTopology as ParamT
 
 
 # Number of network nodes
-iNodes = 50
+iNodes = 10
 standardSF = 7  # Used to calculate min range to at least one neighbor node
 standardPtx = 13
 standardEnvironment = 'urban'
@@ -80,7 +80,7 @@ while file_exists(fileName):
         .format(iNodes, standardSF, networkX, networkY, file_itr)
 
 with open(fileName, mode="w", newline='') as csvfile:
-    fieldnames = ['id', 'x', 'y']
+    fieldnames = ['id', 'x', 'y', 'drift', 'activation']
     range_sf = ParamT.sf()
     range_ptx = ParamT.ptx()
     range_env = ParamT.env()
@@ -94,7 +94,12 @@ with open(fileName, mode="w", newline='') as csvfile:
     writer.writeheader()
 
     for i in dict_nodes:
-        dict_row = {'id': dict_nodes[i].id, 'x': dict_nodes[i].x, 'y': dict_nodes[i].y}
+        dict_row = {'id': dict_nodes[i].id,
+                    'x': dict_nodes[i].x,
+                    'y': dict_nodes[i].y,
+                    'drift': dict_nodes[i].clock_drift,
+                    'activation':dict_nodes[i].activation_time,
+                    }
         for sf in range_sf:
             for ptx in range_ptx:
                 for env in range_env:
