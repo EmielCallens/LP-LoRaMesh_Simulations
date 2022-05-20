@@ -1,6 +1,7 @@
 import math
 import random
 from lib.param import ParamTopology as ParamT
+from setup import Sim1 as Sim
 
 
 # Class used for networkTopology only contains ID and x,y coordinates
@@ -99,6 +100,9 @@ class SimNode:
         self.__mode_time = activation_time  # time between 0 and 5 min to activate node
         self.__clock_drift = clock_drift  # random clock drift in range of 10ppm or 10microsecond/s
         self.__mode_time_drift = float(activation_time) + activation_time / (self.__clock_drift * 10**6)
+        self.__cycle_time = Sim.time_cycle() \
+                            + (Sim.time_cycle() / (self.__clock_drift * 10**6)) \
+                            + self.__mode_time_drift
         self.__neighbors = neighbors
         self.__routing_tabel = {}
         self.__buffer = []
@@ -141,6 +145,22 @@ class SimNode:
     @property
     def clock_drift(self):
         return self.__clock_drift
+
+    @property
+    def mode_time_drift(self):
+        return self.__mode_time_drift
+
+    @mode_time_drift.setter
+    def mode_time_drift(self, value):
+        self.__mode_time_drift = value
+
+    @property
+    def cycle_time(self):
+        return self.__cycle_time
+
+    @cycle_time.setter
+    def cycle_time(self, value):
+        self.__cycle_time = value
 
     @property
     def neighbors(self):

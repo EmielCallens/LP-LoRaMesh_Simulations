@@ -147,6 +147,8 @@ def switch_mode(node):
             new_mode = 'SLEEP'
             # Do this tomorrow, handling sleep is difficult,
             # needs to keep in mind the cycle and spi Tx preparation
+            if len(node.buffer) == 0:
+                new_time = node.cycle_time
             new_time = Sim.time_rx_payload()
             new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
 
@@ -156,23 +158,7 @@ def switch_mode(node):
     # TX_payload
 
 
-    # RX_HEAR ends and preamble is still going
-    if node.mode == 'RX_HEAR' and node.overhear_preamble == 1:
-        new_mode = 'RX_REC'
-        # new_time = mode_time from transmitter + 1 * ParamT.symbol_time()[Sim.sf()]
-    # RX_HEAR ends preamble stopped or collision
-    if node.mode == 'RX_HEAR' and node.overhear_preamble != 1:
-        new_mode = 'RX_IDLE'
-        new_time = node.mode_leftover_time
 
-    # Overhear preamble at start of mod switch
-    if new_mode == 'RX_IDLE' and node.overhear_preamble == 1:
-        new_mode = 'RX_HEAR'
-        new_leftover_time = new_time - 1 * ParamT.symbol_time()[Sim.sf()]
-        new_time = 1 * ParamT.symbol_time()[Sim.sf()]
-    if new_mode == 'CAD_IDLE' and node.overhear_preamble == 1:
-        new_mode = 'CAD_HEAR'
-        new_time = 1 * ParamT.symbol_time()[Sim.sf()]
 
     # Consumption Calculation
     if new_mode == 'SLEEP' or new_mode == 'SPI_TX' or new_mode == 'SPI_RX':
@@ -187,8 +173,7 @@ def switch_mode(node):
     node.mode = new_mode
     node.mode_time_drift = new_time_drift
     node.mode_time = new_time
-    #node.mode_leftover_time = new_leftover_time
-   # node.cycle_time = leftover_cycle_time
+
     node.consumption += new_consumption
     return node
 
@@ -229,10 +214,6 @@ while simTime <= simRuntime:
             delta_time = dict_simNodes[i].mode_time
 
     for i in dict_simNodes:
-        # Add all nodes where mode_time ended to action list
-        if dict_simNodes[i].mode_time <= delta_time:
-            list_actions.append(i)
-
         # Change passed network time to passed node time
         delta_time_drift = delta_time + delta_time / (dict_simNodes[i].clock_drift * 10 ** 6)
 
@@ -250,6 +231,10 @@ while simTime <= simRuntime:
             dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
         else:
             dict_simNodes[i].cycle_time -= delta_time_drift  # subtract loop time period from all cycle_times
+
+        # Add all nodes where mode_time ended to action list
+        if dict_simNodes[i].mode_time <= 0:
+            list_actions.append(dict_simNodes[i])
 
     # Add time to network clock
     simTime += delta_time
