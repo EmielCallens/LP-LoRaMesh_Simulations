@@ -56,25 +56,52 @@ file_setup.close()
 def switch_mode(node):
     new_mode = ''
     new_time = 0
-    new_time_drift = 0
-    new_consumption = 0
-    new_leftover_time = 0  # what do i use this for again?
-    leftover_cycle_time = 0
+    new_cycle_time = 0.0
+    new_consumption = 0.0
+
     # SLEEP
     if node.mode == 'SLEEP':
-        # Wake Up - No Transmission
-        if len(node.buffer) == 0:
-            if Sim.detection_mode() == 'RX':
-                new_mode = 'start_RX'
-                new_time = ParamT.time_osc() + ParamT.time_fs()
-                new_time_drift = new_time + new_time / (node.clock_drift * 10**6)
-            if Sim.detection_mode() == 'CAD':
-                new_mode = 'start_RX'
-                new_time = ParamT.time_osc() + ParamT.time_fs()
-                new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
 
-        # Wake Up - Prepare transmit
+        # Buffer Check
+        # Buffer Empty
+        if len(node.buffer) == 0:
+            # Start new cycle time
+            new_cycle_time = Sim.time_cycle()
+            new_cycle_time = new_cycle_time + new_cycle_time / (node.clock_drift * 10 ** 6)  # Add Drift to cycle_time
+
+            # Detection Mode
+            # RX
+            if Sim.detection_mode() == 'RX':
+
+                new_time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
+                new_consumption = Sim.time_reg_1() * ParamT.power_sleep()
+                new_consumption += (ParamT.time_osc() + ParamT.time_fs()) * ParamT.power_rx() * 10**-6
+
+                # Preamble check
+                if len(node.preamble) == 0:
+                    new_mode = 'RX_timeout'
+                    new_time += Sim.time_rx_timeout()
+                    new_consumption += Sim.time_rx_timeout() * ParamT.power_rx() * 10**-6
+                else:
+                    new_mode = 'RX_sync'
+                    new_time += Sim.time_rx_sync()
+                    new_consumption += Sim.time_rx_sync() * ParamT.power_rx() * 10**-6
+
+            # CAD
+            if Sim.detection_mode() == 'CAD':
+                new_mode = 'CAD'
+                new_time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
+                new_time += ParamT.time_cad_rx()[Sim.sf()] + ParamT.time_cad_process()[Sim.sf()]
+                new_consumption = Sim.time_reg_1() * ParamT.power_sleep() * 10**-6  # T_reg(1)
+                new_consumption += (ParamT.time_osc() + ParamT.time_fs()) * ParamT.power_rx() * 10**-6  # T_OSC + T_FS
+                new_consumption += ParamT.consumption_cad()[Sim.sf()]  # Consumption_CAD
+
+        # Buffer Not Empty ---------- continue here tomorrow
         else:
+            # Start new cycle time
+            new_cycle_time = Sim.time_cycle()
+            new_cycle_time = new_cycle_time + new_cycle_time / (node.clock_drift * 10 ** 6)  # Add Drift to cycle_time
+
             new_mode = 'STANDBY_TX'
             new_time = Sim.spi_payload(node.buffer[0].payload)
             new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
@@ -171,8 +198,8 @@ def switch_mode(node):
         new_consumption = ParamT.power_tx()[Sim.sf()] * new_time  # mW * second = mJ
 
     node.mode = new_mode
-    node.mode_time_drift = new_time_drift
     node.mode_time = new_time
+    node.cycle_time = new_cycle_time
 
     node.consumption += new_consumption
     return node

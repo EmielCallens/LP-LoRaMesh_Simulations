@@ -50,19 +50,6 @@ class Sim1:
         n_payload = ParamT.n_payload_calc([Sim1.byte_mesh_header(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
         return n_payload  # options: 1-255 bytes
 
-    @staticmethod
-    def spi_payload_max():
-        return round(((Sim1.payload() + 1) / Sim1.rate_spi()) * 10**6)  # time in µs (add 10^6 for sec to µs)
-
-    @staticmethod
-    def spi_payload_min():
-        # Might want to add more than mesh header for some protocols
-        return round(((Sim1.byte_mesh_header() + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
-
-    @staticmethod
-    def spi_payload(value):
-        # custom payload size in bytes
-        return  round(((value + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
 
     @staticmethod
     def n_cycle():
@@ -106,9 +93,33 @@ class Sim1:
 
     # All mode switch delays
     @staticmethod
-    def time_switch_mode_reg():
+    def time_reg_1():
         # Treg(1) = 174 for baud rate 115200
         return math.ceil((16 / Sim1.rate_spi()) * 10**6)  # time in µs (add 10^6 for sec to µs)
+
+    @staticmethod
+    def time_reg_2():
+        # SF7 gives  µs
+        return math.ceil((24 / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+
+    @staticmethod
+    def time_reg_payload_255():
+        return round(((Sim1.payload() + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+
+    @staticmethod
+    def time_reg_payload_mheader():
+        # Might want to add more than mesh header for some protocols
+        return round(((Sim1.byte_mesh_header() + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+
+    @staticmethod
+    def time_reg_payload_value(value):
+        # custom payload size in bytes
+        return round(((value + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+
+    @staticmethod
+    def time_rx_timeout():
+        # 2 symbols at SF 7: 1024 µs
+        return 4 * ParamT.time_symbol()[Sim1.sf()]  # time in µs
 
     @staticmethod
     def time_rx_sync():
@@ -124,11 +135,6 @@ class Sim1:
     def time_rx_address():
         # SF7 gives 1463 µs
         return (16 * 1.25 * 10**6) / ParamT.rate_bit()[Sim1.sf()]  # time in µs
-
-    @staticmethod
-    def time_reg_read_address():
-        # SF7 gives 1463 µs
-        return math.ceil((24 / Sim1.rate_spi()) * 10**6)  # time in µs (add 10^6 for sec to µs)
 
     @staticmethod
     def time_rx_payload():
@@ -148,8 +154,6 @@ class Sim1:
             'payload': Sim1.payload(),
             'n_payload_max': Sim1.n_payload_max(),
             'n_payload_min': Sim1.n_payload_min(),
-            'spi_payload_max': Sim1.spi_payload_max(),
-            'spi_payload_min': Sim1.spi_payload_min(),
             'n_cycle': Sim1.n_cycle(),
             'time_cycle': Sim1.time_cycle(),
             'n_preamble': Sim1.n_preamble(),
@@ -160,7 +164,11 @@ class Sim1:
             'buffer_size': Sim1.buffer_size(),
             'mesh_header': Sim1.mesh_header(),
             'byte_mesh_header': Sim1.byte_mesh_header(),
-            'switch_mode_reg': Sim1.time_switch_mode_reg(),
+            'time_reg_1': Sim1.time_reg_1(),
+            'time_reg_2': Sim1.time_reg_2(),
+            'time_reg_payload_255': Sim1.time_reg_payload_255(),
+            'time_reg_payload_mheader': Sim1.time_reg_payload_mheader(),
+            'time_rx_timeout': Sim1.time_rx_timeout(),
             'time_rx_sync': Sim1.time_rx_sync(),
             'time_rx_header': Sim1.time_rx_header(),
             'time_rx_address': Sim1.time_rx_address(),

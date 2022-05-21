@@ -115,7 +115,7 @@ class ParamTopology:
         return {6: 192, 7: 343, 8: 681, 9: 1408, 10: 3067, 11: 6508, 12: 13962}  # in µs
     @staticmethod
     def power_cad():
-        return {'RX': 12.4 * 3.3, 'Process': 6.8 * 3.3}  # 3.3V supply voltage
+        return {'RX': 12.4 * 3.3, 'Process': 6.8 * 3.3}  # 3.3V supply voltage, power in mW
     @staticmethod
     def consumption_cad():
         # standby power consumption SX1276 (only used when Rx and Tx finished before switching to sleep or Tx)
