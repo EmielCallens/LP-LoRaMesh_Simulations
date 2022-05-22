@@ -18,7 +18,7 @@ class Sim1:
 
     @staticmethod
     def runtime():
-        return 1000*1000*60  # *15  # run for 15min, in microseconds
+        return 1000*1000*60*60 + 1000*1000*60*15   # run for 75min, in microseconds
 
     @staticmethod
     def ih():
@@ -42,12 +42,12 @@ class Sim1:
 
     @staticmethod
     def n_payload_max():
-        n_payload = ParamT.n_payload_calc([Sim1.payload(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
+        n_payload = ParamT.n_payload_calc([Sim1.payload(), Sim1.sf(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
         return n_payload  # options: 1-255 bytes
 
     @staticmethod
     def n_payload_min():
-        n_payload = ParamT.n_payload_calc([Sim1.byte_mesh_header(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
+        n_payload = ParamT.n_payload_calc([Sim1.byte_mesh_header(), Sim1.sf(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
         return n_payload  # options: 1-255 bytes
 
 

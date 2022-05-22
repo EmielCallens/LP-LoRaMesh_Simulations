@@ -19,6 +19,7 @@ def RX_sync(node):
 
 
 def RX_preamble(node):
+
     mode = 'RX_preamble'
     time = Sim.time_preamble()
     consumption = time * ParamT.power_rx() * 10 ** -6
@@ -40,10 +41,11 @@ def RX_header(node):
 
 
 def RX_address(node):
+    print("ID", node.node_id, "RX_address start receive")
     mode = 'RX_address'
     time = Sim.time_rx_address() + Sim.time_reg_2()
     consumption = time * ParamT.power_rx() * 10 ** -6
-    if node.payload[0].target_id != node.node_id or node.payload[0].target_id != 'broadcast':
+    if node.payload_buffer[0].target_id != node.node_id or node.payload_buffer[0].target_id != 'broadcast':
         # Packet is not ment for receiver, switch to SLEEP
         time += Sim.time_reg_1()
         consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
@@ -67,7 +69,7 @@ def CAD(node):
 # --------- STANDBY Modes --------- ---------
 def STANDBY_start(node):
     mode = 'STANDBY_start'
-    if len(node.buffer) == 0:
+    if len(node.payload_buffer) == 0:
         # Prepare detection, nothing to transmit
         time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
         consumption = ParamT.time_osc() * ParamT.power_standby() * 10 ** -6
@@ -83,7 +85,7 @@ def STANDBY_start(node):
 def STANDBY_write(node):
     mode = 'STANDBY_write'
     # Write payload over SPI into FIFO Buffer
-    time = Sim.time_reg_payload_value(node.buffer[0].total_payload_length)
+    time = Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
     consumption = time * ParamT.power_standby() * 10 ** -6
     # Switch to detection
     time += Sim.time_reg_1() + ParamT.time_fs()
@@ -95,7 +97,7 @@ def STANDBY_write(node):
 def STANDBY_read(node):
     mode = 'STANDBY_read'
     # Read payload over SPI from FIFO Buffer
-    time = Sim.time_reg_payload_value(node.payload[0].total_payload_length)
+    time = Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
     consumption = time * ParamT.power_standby() * 10 ** -6
     # Switch to SLEEP
     time += Sim.time_reg_1()
@@ -105,7 +107,7 @@ def STANDBY_read(node):
 
 def STANDBY_clear(node):
     mode = 'STANDBY_clear'
-    if len(node.buffer) == 0:
+    if len(node.payload_buffer) == 0:
         # Switch to SLEEP
         time = Sim.time_reg_1()
         consumption = time * ParamT.power_standby() * 10 ** -6
@@ -115,7 +117,7 @@ def STANDBY_clear(node):
         consumption = time * ParamT.power_standby() * 10 ** -6
         # Start FS for transmission
         time += ParamT.time_fs()
-        consumption += ParamT.time_fs() * ParamT.power_tx() * 10 ** -6
+        consumption += ParamT.time_fs() * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
     return mode, time, consumption
 
 
@@ -126,7 +128,7 @@ def STANDBY_detected(node):
     consumption = time * ParamT.power_standby() * 10 ** -6
     # Start FS for receive
     time += ParamT.time_fs()
-    consumption += ParamT.time_fs() * ParamT.power_tx() * 10 ** -6
+    consumption += ParamT.time_fs() * ParamT.power_rx() * 10 ** -6
     return mode, time, consumption
 
 
@@ -136,5 +138,38 @@ def STANDBY_stop(node):
     consumption = time * ParamT.power_standby() * 10 ** -6
     return mode, time, consumption
 
-# --------- Transmit Modes --------- ---------
 
+# --------- Transmit Modes --------- ---------
+def TX_preamble(node):
+    mode = 'TX_preamble'
+    time = Sim.time_preamble()
+    consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
+    return mode, time, consumption
+
+
+def TX_word(node):
+    mode = 'TX_word'
+    time = Sim.time_rx_syncword()
+    consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
+    return mode, time, consumption
+
+
+def TX_payload(node):
+    mode = 'TX_payload'
+    time = Sim.time_rx_payload()
+    consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
+    return mode, time, consumption
+
+
+# --------- Transmit Modes --------- ---------
+def SLEEP(node):
+    mode = 'SLEEP'
+    # Finish cycle in sleep mode
+    time = node.cycle_time
+    # Payload buffer has a packet, need to wake-up early for STANDBY_write
+    if len(node.payload_buffer) > 0:
+        time -= Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
+    # Switch to STANDBY_start
+    time += Sim.time_reg_1()
+    consumption = time * ParamT.power_sleep()
+    return mode, time, consumption

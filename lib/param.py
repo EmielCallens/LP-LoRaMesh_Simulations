@@ -201,7 +201,7 @@ class ParamTopology:
             return payload_sym
 
         except ValueError:
-            print("value does not contain [payload_size, sf, ih, crc, de, cr]")
+            print("value does not contain [payload_size, sf, ih, crc, de, cr], but is",value)
 
     @staticmethod
     def n_syncword():

@@ -1,9 +1,0 @@
-sf: 7
-ptx: 13
-env: urban
-runtime: 60000000
-header_type: explicit
-crc: 1
-cr: 0.8
-target: broadcast
-sample_time: 60000000

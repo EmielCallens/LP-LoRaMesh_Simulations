@@ -17,7 +17,7 @@ simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n50_sf7_area3000x3000_id0.csv"
+file_networkMap = "networkTopology/n10_sf7_area3000x3000_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
@@ -69,7 +69,7 @@ def switch_mode(node):
 
     # END - STANDBY_start
     if node.mode == 'STANDBY_start':
-        if len(node.buffer) == 0:
+        if len(node.payload_buffer) == 0:
             if Sim.detection_mode() == 'RX':
                 if len(node.recv_preamble) == 0:
                     # Start - RX_timeout
@@ -82,7 +82,7 @@ def switch_mode(node):
                 # Start - CAD
                 new_mode, new_time, new_consumption = modes.CAD(node)
             else:
-                print("Error mode:",node.mode,"does not exist")
+                print("Error mode:", Sim.detection_mode(), "does not exist")
         else:
             # Start - STANDBY_write
             new_mode, new_time, new_consumption = modes.STANDBY_write(node)
@@ -128,8 +128,9 @@ def switch_mode(node):
     # END - RX_address
     if node.mode == 'RX_address':
         # Packet not ment for node
-        if node.payload[0].target_id != node.node_id or node.payload[0].target_id != 'broadcast':
+        if node.payload_buffer[0].target_id != node.node_id or node.payload_buffer[0].target_id != 'broadcast':
             # Start - SLEEP
+            print("Address missmatch")
             new_mode, new_time, new_consumption = modes.SLEEP(node)
         else:
             # Start - RX_payload
@@ -149,122 +150,71 @@ def switch_mode(node):
     if node.mode == 'CAD':
         # No preamble
         if len(node.recv_preamble) == 0:
+            # Start - STANDBY_clear
             new_mode, new_time, new_consumption = modes.STANDBY_clear(node)
         # Preamble detected
         else:
+            # Start - STANDBY_detected
             new_mode, new_time, new_consumption = modes.STANDBY_detected(node)
 
     # END - STANDBY_write
     if node.mode == 'STANDBY_write':
-
-
-
-
-
-
-
-
-
-
-    # END - STANDBY_TX
-    if node.mode == 'STANDBY_TX':
-        #Detection Mode
-        #RX
         if Sim.detection_mode() == 'RX':
-            # Preamble check
-            if len(node.preamble) == 0:
-                new_mode = 'RX_timeout'
-                new_time = Sim.time_rx_timeout()
-                new_consumption += Sim.time_rx_timeout() * ParamT.power_rx() * 10 ** -6
+            if len(node.recv_preamble) == 0:
+                # Start - RX_timeout
+                new_mode, new_time, new_consumption = modes.RX_timeout(node)
             else:
-                new_mode = 'RX_sync'
-                new_time = Sim.time_rx_sync()
-                new_consumption += Sim.time_rx_sync() * ParamT.power_rx() * 10 ** -6
+                # Start - RX_sync
+                new_mode, new_time, new_consumption = modes.RX_sync(node)
 
-        # CAD
-        if Sim.detection_mode() == 'CAD':
-            new_mode = 'CAD'
-            new_time =
-            new_consumption = *10 ** -6
-
-    # STANDBY
-    # start_CAD
-    # CAD
-    # start_RX
-    if node.mode == 'start_RX':
-        new_mode = 'RX_sync'
-        new_time = Sim.time_rx_sync()
-        new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
-
-    # RX_sync
-    if node.mode == 'RX_sync':
-        # No preamble at receiver
-        if len(node.recv_preamble) == 0:
-            new_mode = 'RX_timeout'
-            new_time = Sim.time_rx_sync()
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
-
-        # 1 preamble at receiver no data transmission active to collide.
-        if len(node.recv_preamble) == 1 and len(node.recv_payload) == 0:
-            new_mode = 'RX_preamble'
-            # set to max time preamble + word but will be cut short by transmitter when it changes to payload
-            new_time = Sim.time_preamble() + ParamT.time_syncword(Sim.sf())
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
-
-        # Collision at receiver
-        if len(node.recv_preamble) + len(node.recv_payload) > 1:
-            new_mode = 'RX_timeout'
-            new_time = Sim.time_rx_sync()
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
-
-    # RX_preamble
-    # Should never end, transmitter should always end it
-    # when transmitter ends it the RX_sync starts
-    print("error RX_preamble mode ended")
-
-    # RX_word
-    if node.mode == 'RX_sync':
-        new_mode = 'RX_header'
-        new_time = Sim.time_rx_header()
-        new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
-    # RX_header
-    if node.mode == 'RX_header':
-        # Broadcast protocols have no address filtering
-        if Sim.target() == 'broadcast':
-            new_mode = 'RX_payload'
-            new_time = Sim.time_rx_payload() + 1000  # 1000 to avoid it from ending before transmitter
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
-
-        # Targeted protocols with address
+        elif Sim.detection_mode() == 'CAD':
+            # Start - CAD
+            new_mode, new_time, new_consumption = modes.CAD(node)
         else:
-            new_mode = 'RX_address'
-            new_time = Sim.time_rx_address() + Sim.time_reg_read_address()
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+            print("Detection mode", Sim.detection_mode(), "does not exist")
 
-    # RX_address
-    if node.mode == 'RX_address':
-        # Address set to true, means continue to receive payload
-        if node.recv_address == node.node_id:
-            new_mode = 'RX_payload'
-            new_time = Sim.time_rx_payload()
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+    # END - STANDBY_read
+    if node.mode == 'STANDBY_read':
+        # Start - SLEEP
+        new_mode, new_time, new_consumption = modes.SLEEP(node)
 
-        # Address false
+    # END - STANDBY_clear
+    if node.mode == 'STANDBY_clear':
+        if len(node.payload_buffer) == 0:
+            # Start - SLEEP
+            new_mode, new_time, new_consumption = modes.SLEEP(node)
         else:
-            new_mode = 'SLEEP'
-            # Do this tomorrow, handling sleep is difficult,
-            # needs to keep in mind the cycle and spi Tx preparation
-            if len(node.buffer) == 0:
-                new_time = node.cycle_time
-            new_time = Sim.time_rx_payload()
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+            # Start - TX_preamble
+            new_mode, new_time, new_consumption = modes.TX_preamble(node)
 
-    # RX_payload
-    # RX_timeout
-    # TX_preamble
-    # TX_payload
-    # SLEEP
+    # END - STANDBY_detected
+    if node.mode == 'STANDBY_detected':
+        # Start - RX_sync
+        new_mode, new_time, new_consumption = modes.RX_sync(node)
+
+    # END - STANDBY_stop
+    if node.mode == 'STANDBY_stop':
+        # Start - RX_SLEEP
+        new_mode, new_time, new_consumption = modes.SLEEP(node)
+
+    # END - TX_preamble
+    if node.mode == 'TX_preamble':
+        # Start - TX_word
+        new_mode, new_time, new_consumption = modes.TX_word(node)
+
+    # END - TX_word
+    if node.mode == 'TX_word':
+        # Start - TX_payload
+        new_mode, new_time, new_consumption = modes.TX_payload(node)
+
+    # END - TX_payload
+    if node.mode == 'TX_payload':
+        # Start - TX_payload
+        new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+
+    # END - SLEEP
     if node.mode == 'SLEEP':
+        # Start - STANDBY_start
         new_mode, new_time, new_consumption = modes.STANDBY_start(node)
 
     # Change Node Mode, Time, Consumption and return
@@ -284,9 +234,6 @@ def calc_e_factor():
     return 0
 
 
-
-
-
 # set nodes in initial start position
 dict_simNodes = {}
 for i in dict_networkNodes:
@@ -301,7 +248,7 @@ sim_cycle = 0
 previous_print = 0
 hour_log = 0
 while simTime <= simRuntime:
-    delta_time = simRuntime - simTime  # max time to go as start of delta time this loop
+    delta_time = simRuntime  # max time to go as start of delta time this loop
     list_actions = []  # list of nodes that have an action this loop
     # Time management
     for i in dict_simNodes:
@@ -310,14 +257,12 @@ while simTime <= simRuntime:
             delta_time = dict_simNodes[i].mode_time
 
     for i in dict_simNodes:
+
         # Change passed network time to passed node time
         delta_time_drift = delta_time + delta_time / (dict_simNodes[i].clock_drift * 10 ** 6)
 
         # Mode Time (external, network time)
         dict_simNodes[i].mode_time -= delta_time
-
-        # Mode Time Drift (internal)
-        # dict_simNodes[i].mode_time_drift -= delta_time_drift
 
         # Add node clock (internal)
         dict_simNodes[i].internal_clock += delta_time_drift
@@ -325,13 +270,13 @@ while simTime <= simRuntime:
         # Cycle Time (internal)
         if dict_simNodes[i].cycle_time - delta_time_drift <= 0:
             # Check Buffer to set early wake-up for transmitting
-            if len(dict_simNodes[i].buffer) == 0:
+            if len(dict_simNodes[i].payload_buffer) == 0:
                 # Restart Cycle Time - No Transmitting
                 dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
             else:
                 # Restart Cycle Time - Ready for Transmitting
                 dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
-                dict_simNodes[i].cycle_time -= Sim.time_reg_payload_value(dict_simNodes[i].buffer[0].payload)
+                dict_simNodes[i].cycle_time -= Sim.time_reg_payload_value(dict_simNodes[i].payload_buffer[0].total_payload_length)
 
             # Add Drift to cycle_time
             dict_simNodes[i].cycle_time += dict_simNodes[i].cycle_time / (dict_simNodes[i].clock_drift * 10 ** 6)
@@ -345,7 +290,9 @@ while simTime <= simRuntime:
             if dict_simNodes[i].mode == 'SLEEP':
                 # Add packet to buffer with correct mesh header and payload length information +
                 # other info for simulation
+                print("Generate packet for", dict_simNodes[i].node_id)
                 dict_simNodes[i].add_buffer(SimPacket([dict_simNodes[i].node_id, simTime + delta_time]))
+                dict_simNodes[i].time_gen_packet = dict_simNodes[i].internal_clock
 
         # Add all nodes where mode_time ended to action list
         if dict_simNodes[i].mode_time <= 0:
@@ -359,15 +306,51 @@ while simTime <= simRuntime:
     # Diff modes: SLEEP, start_STANDBY, STANDBY_load_TX, STANDBY, start_CAD, CAD
     # start_RX, RX_sync, RX_preamble, RX_word, RX_header, RX_address RX_payload, RX_timeout, TX_preamble, TX_payload
     # Finish Mode
-    for i in list_actions:
-        print('i', i)
-        print('Old mode', dict_simNodes[i].mode)
-        dict_simNodes[i].consumption += dict_simNodes[i].mode_consumption  # add previous mode consumption
-        dict_simNodes[i] = switch_mode(dict_simNodes[i])
+    for node in list_actions:
+        # print('ID', dict_simNodes[node.node_id].node_id)
+        # print('Modes Old', node.mode)
 
-        print('New mode', dict_simNodes[i].mode)
-        print('New mode time', dict_simNodes[i].mode_time)
-        print('New mode Consumption', dict_simNodes[i].mode_consumption)
+        dict_simNodes[node.node_id].consumption += node.mode_consumption  # add previous mode consumption
+        dict_simNodes[node.node_id] = switch_mode(node)
+
+        # print('Modes New', dict_simNodes[node.node_id].mode)
+        # print('New mode time', dict_simNodes[node.node_id].mode_time)
+
+        # Notify neighbors when preamble starts
+        if dict_simNodes[node.node_id].mode == 'TX_preamble':
+            for n in dict_simNodes[node.node_id].neighbors:
+                dict_simNodes[n].add_recv_preamble(node.node_id)
+                # If in RX_timeout stop the timeout to start receive.
+                if dict_simNodes[n].mode == 'RX_timeout':
+                    dict_simNodes[n].mode_time = 0
+
+        # Notify neighbors when preamble stops (TX_word starts)
+        # Give them packet into payload buffer
+        if dict_simNodes[node.node_id].mode == 'TX_word':
+            for n in dict_simNodes[node.node_id].neighbors:
+                dict_simNodes[n].remove_recv_preamble(node.node_id)
+                dict_simNodes[n].add_recv_payload(node.payload_buffer[0])
+                # If in RX_timeout stop the timeout to start receive.
+                if dict_simNodes[n].mode == 'RX_payload':
+                    dict_simNodes[n].mode_time = 0
+
+        # Add correctly received packet to buffer + let transmitter know
+        if dict_simNodes[node.node_id].mode == 'STANDBY_read':
+            new_payload = dict_simNodes[node.node.node_id].recv_payload[0]
+            # Let transmitter know, +1 good receive, remove payload
+            dict_simNodes[new_payload.transmitter_id].log_total_delivered_packets += 1
+            # This step will need to be done different when using Link-Layer ACK
+            dict_simNodes[new_payload.transmitter_id].remove_buffer(new_payload)
+            # Change and Save packet for retransmission
+            # new transmitter id
+            new_payload.transmitter_id = node.node_id
+            # new target from routing table
+            new_payload.target_id = dict_simNodes[node.node_id].routing_tabel[new_payload.destination_id]
+            # add hop count
+            new_payload.hop_count += 1
+            # save payload
+            dict_simNodes[node.node_id].add_buffer(new_payload)
+
 
     # Hourly Log Management
     if hour_log >= 60 * 60 * 10**6:
@@ -376,19 +359,28 @@ while simTime <= simRuntime:
         # Open Node files and save hour data
         # For debug
         print("One Hour passed, Log Data")
+        for i in dict_simNodes:
+            print("ID", dict_simNodes[i].node_id, "Consumption", dict_simNodes[i].consumption)
+            print("delivered packets", dict_simNodes[i].log_total_delivered_packets)
+
 
     # Increase timer by microseconds to next network action and print node actions to individual Log
     sim_cycle += 1
+    # print("Cycle:", sim_cycle)
+    # print("Runtime:", simTime, "/", simRuntime)
 
     # print progress for debug
-    if simTime - previous_print >= 1 * 10**6:
-        print("Sim Cycle:", sim_cycle, " ", round(simTime / simRuntime), "%")
+    if simTime - previous_print >= 5 * 10**6:
+        print("Sim Cycle:", sim_cycle, " ", round((simTime / simRuntime)*100), "%")
         previous_print = simTime
 
 
 
-
-
+# Simulation - End Logging
+print("End Simulation")
+for i in dict_simNodes:
+    print("ID", dict_simNodes[i].node_id, "Consumption", dict_simNodes[i].consumption)
+    print("delivered packets", dict_simNodes[i].log_total_delivered_packets)
 
 
 
