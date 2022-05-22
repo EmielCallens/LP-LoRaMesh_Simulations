@@ -53,7 +53,7 @@ class Sim1:
 
     @staticmethod
     def n_cycle():
-        return 13402 # sample period, in symbols
+        return 13402  # sample period, in symbols
 
     @staticmethod
     def time_cycle():
@@ -61,7 +61,7 @@ class Sim1:
 
     @staticmethod
     def n_preamble():
-        return 13404 # preamble length in symbols
+        return 13404  # preamble length in symbols
 
     @staticmethod
     def time_preamble():
@@ -127,6 +127,10 @@ class Sim1:
         return ParamT.n_rx_sync() * ParamT.time_symbol()[Sim1.sf()]  # time in µs
 
     @staticmethod
+    def time_rx_syncword():
+        return ParamT.n_syncword() * ParamT.rate_symbol()[Sim1.sf()]
+
+    @staticmethod
     def time_rx_header():
         # SF7 gives 2926 µs
         return (40 * 10**6) / ParamT.rate_bit()[Sim1.sf()]  # time in µs
@@ -170,6 +174,7 @@ class Sim1:
             'time_reg_payload_mheader': Sim1.time_reg_payload_mheader(),
             'time_rx_timeout': Sim1.time_rx_timeout(),
             'time_rx_sync': Sim1.time_rx_sync(),
+            'time_rx_syncword': Sim1.time_rx_syncword(),
             'time_rx_header': Sim1.time_rx_header(),
             'time_rx_address': Sim1.time_rx_address(),
             'time_rx_payload': Sim1.time_rx_payload()

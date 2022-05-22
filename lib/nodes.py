@@ -96,23 +96,22 @@ class SimNode:
     def __init__(self, node_id=0, clock_drift=0, activation_time=0, neighbors=None):
         self.__node_id = node_id
         self.__internal_clock = 0.0
-        self.__mode = 'SLEEP'
+        self.__mode = 'POWER_OFF'
         self.__mode_time = activation_time  # time between 0 and 5 min to activate node
+        self.__mode_consumption = 0.0  # consumption to add when mode is over
         self.__clock_drift = clock_drift  # random clock drift in range of 10ppm or 10microsecond/s
-        self.__mode_time_drift = float(activation_time) + activation_time / (self.__clock_drift * 10**6)
+        # self.__mode_time_drift = float(activation_time) + activation_time / (self.__clock_drift * 10**6)
         self.__cycle_time = Sim.time_cycle() \
                             + (Sim.time_cycle() / (self.__clock_drift * 10**6)) \
-                            + self.__mode_time_drift
+                            + self.__mode_time
         self.__neighbors = neighbors
         self.__routing_tabel = {}
         self.__buffer = []
         self.__recv_preamble = []
         self.__recv_payload = []
         self.__recv_address = ''
-        #self.__consumption = 0  # count total node consumption in microJoule
-        #self.__energy_factor = 0
-        #self.__tx_min_time = 0  # Min time for next Tx to keep duty cycle happy (dependent on toa of last tx)
-        #self.__overhear_preamble = 0  # 0 = No preamble heard, 1 = preamble heard, 2 = 2 preamble heard (collision), ...
+        self.__recv_collision = False
+        self.__consumption = 0.0  # count total node consumption in microJoule
 
     @property
     def node_id(self):
@@ -141,6 +140,14 @@ class SimNode:
     @mode_time.setter
     def mode_time(self, value):
         self.__mode_time = value
+
+    @property
+    def mode_consumption(self):
+        return self.__mode_consumption
+
+    @mode_consumption.setter
+    def mode_consumption(self, value):
+        self.__mode_consumption = value
 
     @property
     def clock_drift(self):
@@ -216,35 +223,59 @@ class SimNode:
     def recv_address(self, value):
         self.__recv_address = value
 
+    @property
+    def recv_collision(self):
+        return self.__recv_collision
 
-    #@property
-    #def consumption(self):
-    #    return self.__consumption
+    @recv_collision.setter
+    def recv_collision(self, value):
+        self.__recv_collision = value
 
-    #@consumption.setter
-    #def consumption(self, value):
-    #    self.__consumption = value
 
-    #@property
-    #def energy_factor(self):
-    #    return self.__energy_factor
+# Class used as packet and for route data gathering during simulation
+class SimPacket:
+    def __init__(self, source_id=0, source_timestamp=0, target_id='broadcast'):
+        self.__source_id = source_id
+        self.__source_timestamp = source_timestamp
+        self.__target_id = target_id
+        self.__mesh_header_length = Sim.byte_mesh_header()
+        self.__total_payload_length = Sim.payload()
+        self.__mesh_header = {}
+        for i in Sim.mesh_header():
+            self.__mesh_header = {i: 0}
 
-    #@energy_factor.setter
-    #def energy_factor(self, value):
-    #   self.__energy_factor = value
+    @property
+    def source_id(self):
+        return self.__source_id
 
-    #@property
-    #def tx_min_time(self):
-    #    return self.__tx_min_time
+    @property
+    def source_timestamp(self):
+        return self.__source_timestamp
 
-    #@tx_min_time.setter
-    #def tx_min_time(self, value):
-    #    self.__tx_min_time = value
+    @property
+    def target_id(self):
+        return self.__target_id
 
-    #@property
-    #def overhear_preamble(self):
-    #   return self.__overhear_preamble
+    @target_id.setter
+    def target_id(self, value):
+        self.__target_id = value
 
-    #@overhear_preamble.setter
-    #def overhear_preamble(self, value):
-    #    self.__overhear_preamble = value
+    @property
+    def mesh_header_length(self):
+        return self.__mesh_header_length
+
+    @property
+    def total_payload_length(self):
+        return self.__total_payload_length
+
+    @property
+    def mesh_header(self):
+        return self.__mesh_header
+
+    def change_mesh_header(self, value):
+        try:
+            field_name, field_value = value
+            self.__mesh_header[field_name] = field_value
+            return self.__mesh_header
+        except ValueError:
+            print("ValueError detected in unpack_per must be: value = [field_name, field_value]")

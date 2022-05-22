@@ -237,16 +237,6 @@ class ParamTopology:
             print("value does not contain [preamble_sizes, sf]")
 
     @staticmethod
-    def time_syncword(value):
-        try:
-            sf = value
-            toa = 4.25 * ParamTopology.rate_symbol()[sf]
-
-            return toa
-        except ValueError:
-            print("value does not contain [sf]")
-
-    @staticmethod
     def time_osc():
         return 250
 

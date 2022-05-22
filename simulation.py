@@ -4,8 +4,11 @@ import math
 import csv
 import random
 
+import modes
+
 from lib.nodes import NetworkNode
 from lib.nodes import SimNode
+from lib.nodes import SimPacket
 from lib.param import ParamTopology as ParamT
 from setup import Sim1 as Sim
 
@@ -56,58 +59,135 @@ file_setup.close()
 def switch_mode(node):
     new_mode = ''
     new_time = 0
-    new_cycle_time = 0.0
     new_consumption = 0.0
 
-    # SLEEP
-    if node.mode == 'SLEEP':
+    # All modes noted are the END of the mode and the new mode timing and consumption
+    # END - POWER_OFF
+    if node.mode == 'POWER_OFF':
+        # Start - STANDBY_start
+        new_mode, new_time, new_consumption = modes.STANDBY_start(node)
 
-        # Buffer Check
-        # Buffer Empty
+    # END - STANDBY_start
+    if node.mode == 'STANDBY_start':
         if len(node.buffer) == 0:
-            # Start new cycle time
-            new_cycle_time = Sim.time_cycle()
-            new_cycle_time = new_cycle_time + new_cycle_time / (node.clock_drift * 10 ** 6)  # Add Drift to cycle_time
-
-            # Detection Mode
-            # RX
             if Sim.detection_mode() == 'RX':
-
-                new_time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
-                new_consumption = Sim.time_reg_1() * ParamT.power_sleep()
-                new_consumption += (ParamT.time_osc() + ParamT.time_fs()) * ParamT.power_rx() * 10**-6
-
-                # Preamble check
-                if len(node.preamble) == 0:
-                    new_mode = 'RX_timeout'
-                    new_time += Sim.time_rx_timeout()
-                    new_consumption += Sim.time_rx_timeout() * ParamT.power_rx() * 10**-6
+                if len(node.recv_preamble) == 0:
+                    # Start - RX_timeout
+                    new_mode, new_time, new_consumption = modes.RX_timeout(node)
                 else:
-                    new_mode = 'RX_sync'
-                    new_time += Sim.time_rx_sync()
-                    new_consumption += Sim.time_rx_sync() * ParamT.power_rx() * 10**-6
+                    # Start - RX_sync
+                    new_mode, new_time, new_consumption = modes.RX_sync(node)
 
-            # CAD
-            if Sim.detection_mode() == 'CAD':
-                new_mode = 'CAD'
-                new_time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
-                new_time += ParamT.time_cad_rx()[Sim.sf()] + ParamT.time_cad_process()[Sim.sf()]
-                new_consumption = Sim.time_reg_1() * ParamT.power_sleep() * 10**-6  # T_reg(1)
-                new_consumption += (ParamT.time_osc() + ParamT.time_fs()) * ParamT.power_rx() * 10**-6  # T_OSC + T_FS
-                new_consumption += ParamT.consumption_cad()[Sim.sf()]  # Consumption_CAD
-
-        # Buffer Not Empty ---------- continue here tomorrow
+            elif Sim.detection_mode() == 'CAD':
+                # Start - CAD
+                new_mode, new_time, new_consumption = modes.CAD(node)
+            else:
+                print("Error mode:",node.mode,"does not exist")
         else:
-            # Start new cycle time
-            new_cycle_time = Sim.time_cycle()
-            new_cycle_time = new_cycle_time + new_cycle_time / (node.clock_drift * 10 ** 6)  # Add Drift to cycle_time
+            # Start - STANDBY_write
+            new_mode, new_time, new_consumption = modes.STANDBY_write(node)
 
-            new_mode = 'STANDBY_TX'
-            new_time = Sim.spi_payload(node.buffer[0].payload)
-            new_time_drift = new_time + new_time / (node.clock_drift * 10 ** 6)
+    # END - RX_timeout
+    if node.mode == 'RX_timeout':
+        if len(node.recv_preamble) == 0:
+            # Start - STANDBY_clear
+            new_mode, new_time, new_consumption = modes.STANDBY_clear(node)
+        else:
+            # Start - RX_sync
+            new_mode, new_time, new_consumption = modes.RX_sync(node)
 
-    # start_STANDBY
-    # STANDBY_load_TX
+    # END - RX_sync
+    if node.mode == 'RX_sync':
+        if len(node.recv_preamble) == 0:
+            # Start - RX_timeout
+            new_mode, new_time, new_consumption = modes.RX_timeout(node)
+        else:
+            # Start - RX_preamble
+            new_mode, new_time, new_consumption = modes.RX_preamble(node)
+
+    # END - RX_preamble
+    if node.mode == 'RX_preamble':
+        # Start - RX_word
+        new_mode, new_time, new_consumption = modes.RX_word(node)
+
+    # END - RX_word
+    if node.mode == 'RX_word':
+        # Start - RX_header
+        new_mode, new_time, new_consumption = modes.RX_header(node)
+
+    # END - RX_header
+    if node.mode == 'RX_header':
+        # See if there was collision
+        if node.recv_collision:
+            # Start - STANDBY_stop
+            new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+        else:
+            # Start - RX_address
+            new_mode, new_time, new_consumption = modes.RX_address(node)
+
+    # END - RX_address
+    if node.mode == 'RX_address':
+        # Packet not ment for node
+        if node.payload[0].target_id != node.node_id or node.payload[0].target_id != 'broadcast':
+            # Start - SLEEP
+            new_mode, new_time, new_consumption = modes.SLEEP(node)
+        else:
+            # Start - RX_payload
+            new_mode, new_time, new_consumption = modes.RX_payload(node)
+
+    # END - RX_payload
+    if node.mode == 'RX_payload':
+        # See if there was collision
+        if node.recv_collision:
+            # Start - STANDBY_stop because there was collision
+            new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+        else:
+            # Start - STANDBY_read there was no collision
+            new_mode, new_time, new_consumption = modes.STANDBY_read(node)
+
+    # END - CAD
+    if node.mode == 'CAD':
+        # No preamble
+        if len(node.recv_preamble) == 0:
+            new_mode, new_time, new_consumption = modes.STANDBY_clear(node)
+        # Preamble detected
+        else:
+            new_mode, new_time, new_consumption = modes.STANDBY_detected(node)
+
+    # END - STANDBY_write
+    if node.mode == 'STANDBY_write':
+
+
+
+
+
+
+
+
+
+
+    # END - STANDBY_TX
+    if node.mode == 'STANDBY_TX':
+        #Detection Mode
+        #RX
+        if Sim.detection_mode() == 'RX':
+            # Preamble check
+            if len(node.preamble) == 0:
+                new_mode = 'RX_timeout'
+                new_time = Sim.time_rx_timeout()
+                new_consumption += Sim.time_rx_timeout() * ParamT.power_rx() * 10 ** -6
+            else:
+                new_mode = 'RX_sync'
+                new_time = Sim.time_rx_sync()
+                new_consumption += Sim.time_rx_sync() * ParamT.power_rx() * 10 ** -6
+
+        # CAD
+        if Sim.detection_mode() == 'CAD':
+            new_mode = 'CAD'
+            new_time =
+            new_consumption = *10 ** -6
+
+    # STANDBY
     # start_CAD
     # CAD
     # start_RX
@@ -183,25 +263,14 @@ def switch_mode(node):
     # RX_timeout
     # TX_preamble
     # TX_payload
+    # SLEEP
+    if node.mode == 'SLEEP':
+        new_mode, new_time, new_consumption = modes.STANDBY_start(node)
 
-
-
-
-    # Consumption Calculation
-    if new_mode == 'SLEEP' or new_mode == 'SPI_TX' or new_mode == 'SPI_RX':
-        new_consumption = ParamT.power_sleep() * new_time  # mW * second = mJ
-    if new_mode == 'RX_IDLE' or new_mode == 'RX_HEAR' or new_mode == 'RX_REC':
-        new_consumption = ParamT.power_rx() * new_time  # mW * second = mJ
-    if new_mode == 'CAD_IDLE' or new_mode == 'CAD_HEAR' or new_mode == 'CAD_REC':
-        new_consumption = ParamT.power_cad() * new_time  # mW * second = mJ
-    if new_mode == 'TX_PREAMBLE' or new_mode == 'TX_SYNCWORD' or new_mode == 'TX_PAYLOAD':
-        new_consumption = ParamT.power_tx()[Sim.sf()] * new_time  # mW * second = mJ
-
+    # Change Node Mode, Time, Consumption and return
     node.mode = new_mode
     node.mode_time = new_time
-    node.cycle_time = new_cycle_time
-
-    node.consumption += new_consumption
+    node.mode_consumption = new_consumption  # set new mode consumption
     return node
 
 
@@ -248,36 +317,57 @@ while simTime <= simRuntime:
         dict_simNodes[i].mode_time -= delta_time
 
         # Mode Time Drift (internal)
-        dict_simNodes[i].mode_time_drift -= delta_time_drift
+        # dict_simNodes[i].mode_time_drift -= delta_time_drift
 
         # Add node clock (internal)
         dict_simNodes[i].internal_clock += delta_time_drift
 
         # Cycle Time (internal)
         if dict_simNodes[i].cycle_time - delta_time_drift <= 0:
-            dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
+            # Check Buffer to set early wake-up for transmitting
+            if len(dict_simNodes[i].buffer) == 0:
+                # Restart Cycle Time - No Transmitting
+                dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
+            else:
+                # Restart Cycle Time - Ready for Transmitting
+                dict_simNodes[i].cycle_time = Sim.time_cycle() - (delta_time_drift - dict_simNodes[i].cycle_time)
+                dict_simNodes[i].cycle_time -= Sim.time_reg_payload_value(dict_simNodes[i].buffer[0].payload)
+
+            # Add Drift to cycle_time
+            dict_simNodes[i].cycle_time += dict_simNodes[i].cycle_time / (dict_simNodes[i].clock_drift * 10 ** 6)
         else:
+            # Decrease Cycle Time
             dict_simNodes[i].cycle_time -= delta_time_drift  # subtract loop time period from all cycle_times
+
+        # Generate packet every 1hour of internal clock time
+        if dict_simNodes[i].internal_clock >= dict_simNodes[i].time_gen_packet + 60*60 * 10**6:
+            # During SLEEP Add packet to buffer
+            if dict_simNodes[i].mode == 'SLEEP':
+                # Add packet to buffer with correct mesh header and payload length information +
+                # other info for simulation
+                dict_simNodes[i].add_buffer(SimPacket([dict_simNodes[i].node_id, simTime + delta_time]))
 
         # Add all nodes where mode_time ended to action list
         if dict_simNodes[i].mode_time <= 0:
             list_actions.append(dict_simNodes[i])
 
-    # Add time to network clock
+    # Add time to network clock and hour log
     simTime += delta_time
+    hour_log += delta_time
 
     # Action management
     # Diff modes: SLEEP, start_STANDBY, STANDBY_load_TX, STANDBY, start_CAD, CAD
     # start_RX, RX_sync, RX_preamble, RX_word, RX_header, RX_address RX_payload, RX_timeout, TX_preamble, TX_payload
     # Finish Mode
     for i in list_actions:
-        print('Old mode', i.mode)
-        print('Old mode', i.mode)
-
-        dict_simNodes[i] = switch_mode(i)
+        print('i', i)
+        print('Old mode', dict_simNodes[i].mode)
+        dict_simNodes[i].consumption += dict_simNodes[i].mode_consumption  # add previous mode consumption
+        dict_simNodes[i] = switch_mode(dict_simNodes[i])
 
         print('New mode', dict_simNodes[i].mode)
-        print('New time', dict_simNodes[i].mode_time)
+        print('New mode time', dict_simNodes[i].mode_time)
+        print('New mode Consumption', dict_simNodes[i].mode_consumption)
 
     # Hourly Log Management
     if hour_log >= 60 * 60 * 10**6:
