@@ -25,7 +25,7 @@ range90 = ParamT.range90()[Sim.sf()][Sim.ptx()][Sim.env()]
 # import numpy as np
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n3_sf7_area3000x3000_id0.csv"
+file_networkMap = "networkTopology/n50_sf7_area3000x3000_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')

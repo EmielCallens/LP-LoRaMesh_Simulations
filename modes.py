@@ -19,7 +19,6 @@ def RX_sync(node):
 
 
 def RX_preamble(node):
-
     mode = 'RX_preamble'
     time = Sim.time_preamble()
     consumption = time * ParamT.power_rx() * 10 ** -6
@@ -41,19 +40,13 @@ def RX_header(node):
 
 
 def RX_address(node):
-    print("Start RX_address")
-    print("ID", node.node_id, "RX_address start receive")
     mode = 'RX_address'
     time = Sim.time_rx_address() + Sim.time_reg_2()
     consumption = time * ParamT.power_rx() * 10 ** -6
-    print("recv_payload",node.recv_payload[0])
-    print("Address", node.recv_payload[0].target_id)
     if node.recv_payload[0].target_id != node.node_id and node.recv_payload[0].target_id != 'broadcast':
-        print("Reject Address")
         # Packet is not ment for receiver, switch to SLEEP
         time += Sim.time_reg_1()
         consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
-
     return mode, time, consumption
 
 

@@ -102,11 +102,15 @@ class SimNode:
         self.__mode_consumption = 0.0  # consumption to add when mode is over
         self.__clock_drift = clock_drift  # random clock drift in range of 10ppm or 10microsecond/s
         # self.__mode_time_drift = float(activation_time) + activation_time / (self.__clock_drift * 10**6)
-        self.__cycle_time = Sim.time_cycle() \
+        self.__cycle_time = 0
+        if self.__clock_drift != 0:
+            self.__cycle_time = Sim.time_cycle() \
                             + (Sim.time_cycle() / (self.__clock_drift * 10**6)) \
                             + self.__mode_time
+        else:
+            self.__cycle_time = Sim.time_cycle() + self.__mode_time
         self.__neighbors = neighbors
-        self.__routing_tabel = {'sink': 'broadcast'}  # Needs to change after init for most protocols
+        self.__routing_tabel = {'sink': 'broadcast', 'all': 'broadcast'}  # Needs to change after init for most protocols
         self.__payload_buffer = []
         self.__recv_preamble = []
         self.__recv_payload = []
@@ -114,10 +118,12 @@ class SimNode:
         self.__recv_collision = False
         self.__consumption = 0.0  # count total node consumption in microJoule
         self.__log_received_packet_ids = []
+        self.__log_total_received_packets = 0
         self.__log_total_delivered_packets = 0
         self.__log_total_transmitted_packets = 0
         self.__log_total_lost_packets = 0
         self.__log_total_collision_packets = 0
+        self.__log_total_duplicat_packets = 0
 
     @property
     def node_id(self):
@@ -253,6 +259,14 @@ class SimNode:
         self.__log_received_packet_ids.append(value)
 
     @property
+    def log_total_received_packets(self):
+        return self.__log_total_received_packets
+
+    @log_total_received_packets.setter
+    def log_total_received_packets(self, value):
+        self.__log_total_received_packets = value
+
+    @property
     def log_total_delivered_packets(self):
         return self.__log_total_delivered_packets
 
@@ -284,6 +298,14 @@ class SimNode:
     def log_total_collision_packets(self, value):
         self.__log_total_collision_packets = value
 
+    @property
+    def log_total_duplicat_packets(self):
+        return self.__log_total_duplicat_packets
+
+    @log_total_duplicat_packets.setter
+    def log_total_duplicat_packets(self, value):
+        self.__log_total_duplicat_packets = value
+
 
 
 
@@ -296,7 +318,7 @@ class SimPacket:
                  payload_length=Sim.payload(),
                  target_id='broadcast',
                  destination_id='sink',
-                 packet_id='p0'):
+                 packet_id=0):
         self.__source_id = source_id
         self.__source_timestamp = source_timestamp
         self.__target_id = target_id

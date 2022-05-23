@@ -19,11 +19,11 @@ from lib.param import ParamTopology as ParamT
 
 
 # Number of network nodes
-iNodes = 3
+iNodes = 200
 standardSF = 7  # Used to calculate min range to at least one neighbor node
 standardPtx = 13
 standardEnvironment = 'urban'
-maxDistance = ParamT.range90()[standardSF][standardPtx][standardEnvironment] - 200 # Temporary subtract 200 for test
+maxDistance = ParamT.range90()[standardSF][standardPtx][standardEnvironment]
 # Distances in meters
 networkX = 3000
 networkY = 3000
@@ -49,7 +49,7 @@ for i in range(1, iNodes + 1):
             distance_direct = math.sqrt(distance_x ** 2 + distance_y ** 2)
 
             # distance to other node within maxDistance range, jump out of look and accept new node location.
-            if distance_direct <= maxDistance:
+            if distance_direct <= maxDistance:  # Temp 300 added for better effect DEBUG
                 co_accept = True
                 break
 

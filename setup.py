@@ -18,7 +18,7 @@ class Sim1:
 
     @staticmethod
     def runtime():
-        return 1000*1000*60*60 + 1000*1000*60*15   # run for 75min, in microseconds
+        return 1000*1000*60*60 + 1000*1000*60*30   # run for 90min, in microseconds
 
     @staticmethod
     def ih():
