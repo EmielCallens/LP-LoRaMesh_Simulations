@@ -41,14 +41,19 @@ def RX_header(node):
 
 
 def RX_address(node):
+    print("Start RX_address")
     print("ID", node.node_id, "RX_address start receive")
     mode = 'RX_address'
     time = Sim.time_rx_address() + Sim.time_reg_2()
     consumption = time * ParamT.power_rx() * 10 ** -6
-    if node.payload_buffer[0].target_id != node.node_id or node.payload_buffer[0].target_id != 'broadcast':
+    print("recv_payload",node.recv_payload[0])
+    print("Address", node.recv_payload[0].target_id)
+    if node.recv_payload[0].target_id != node.node_id and node.recv_payload[0].target_id != 'broadcast':
+        print("Reject Address")
         # Packet is not ment for receiver, switch to SLEEP
         time += Sim.time_reg_1()
         consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
+
     return mode, time, consumption
 
 
@@ -97,7 +102,7 @@ def STANDBY_write(node):
 def STANDBY_read(node):
     mode = 'STANDBY_read'
     # Read payload over SPI from FIFO Buffer
-    time = Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
+    time = Sim.time_reg_payload_value(node.recv_payload[0].total_payload_length)
     consumption = time * ParamT.power_standby() * 10 ** -6
     # Switch to SLEEP
     time += Sim.time_reg_1()
@@ -172,4 +177,7 @@ def SLEEP(node):
     # Switch to STANDBY_start
     time += Sim.time_reg_1()
     consumption = time * ParamT.power_sleep()
+    # Remove collision if it wasn't cleared because it happened in receive mode
+    if len(node.recv_preamble) + len(node.recv_payload) <= 1:
+        node.recv_collision = False
     return mode, time, consumption

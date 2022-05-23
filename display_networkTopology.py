@@ -25,7 +25,7 @@ range90 = ParamT.range90()[Sim.sf()][Sim.ptx()][Sim.env()]
 # import numpy as np
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n10_sf7_area3000x3000_id0.csv"
+file_networkMap = "networkTopology/n3_sf7_area3000x3000_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
@@ -35,11 +35,9 @@ with open(file_networkMap, newline='') as csvfile:
         dict_networkNodes[row['id']] = NetworkNode(row['id'],
                                                    float(row['x']),
                                                    float(row['y']),
+                                                   int(row['drift']),
+                                                   int(row['activation']),
                                                    dict_links)
-
-        # need to add reading of neighbor file, only add for relevant Sim settings
-        # Probably need to add a declaration part to include neighbor into init van NetworkNodes.
-
 
 # Read simulationData file
 """
@@ -122,6 +120,7 @@ class Topology:
         self.draw_node_info(node_id)
 
     def draw_node_info(self, node_id):
+        print("draw info")
         self.clear_shapes(self.__info)
         # List PER % of each link
         y_start = self.__height_padding + 15
@@ -130,7 +129,9 @@ class Topology:
                                                         font="Times 11",
                                                         text="ID:{}".format(node_id),
                                                         anchor=SW)
+
         dict_pers = dict_networkNodes[node_id].neighbors
+        print('draw pers', dict_networkNodes[node_id])
         for i in dict_pers:
             y_start += 15
             self.__info[i] = self.__canvas.create_text(x_start, y_start,

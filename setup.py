@@ -72,6 +72,10 @@ class Sim1:
         return 'broadcast'  # options: broadcast, address
 
     @staticmethod
+    def link_layer_ack():
+        return False  # options: True or False - disabled for broadcast packets
+
+    @staticmethod
     def detection_mode():
         return 'RX'  # options: CAD, RX
 
@@ -163,6 +167,7 @@ class Sim1:
             'n_preamble': Sim1.n_preamble(),
             'time_preamble': Sim1.time_preamble(),
             'target': Sim1.target(),
+            'link_layer_ack': Sim1.link_layer_ack(),
             'detection_mode': Sim1.detection_mode(),
             'rate_spi': Sim1.rate_spi(),
             'buffer_size': Sim1.buffer_size(),
