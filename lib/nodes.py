@@ -116,14 +116,32 @@ class SimNode:
         self.__recv_payload = []
         self.__recv_address = ''
         self.__recv_collision = False
+
         self.__consumption = 0.0  # count total node consumption in microJoule
-        self.__log_received_packet_ids = []
-        self.__log_total_received_packets = 0
-        self.__log_total_delivered_packets = 0
-        self.__log_total_transmitted_packets = 0
-        self.__log_total_lost_packets = 0
-        self.__log_total_collision_packets = 0
-        self.__log_total_duplicat_packets = 0
+        self.__log_consumption_rx = 0.0
+        self.__log_consumption_tx = 0.0
+        self.__log_consumption_standby = 0.0
+        self.__log_consumption_sleep = 0.0
+        self.__log_received_packets = []
+        self.__log_rx_all_p = 0  # __log_total_received_packets
+        self.__log_rx_fail_collision = 0
+        self.__log_rx_fail_duplicate = 0  # __log_total_duplicat_packets
+        self.__log_rx_fail_buffer = 0    # __log_total_buffer_full_packets
+        self.__log_buffer_max = 0  # __log_max_buffer_size
+
+        self.__log_gen_packets = 0    # __log_total_gen_packets
+        self.__log_tx_all_p = 0  # __log_total_transmitted_packets
+        self.__log_tx_links = {}  # link activity log, transmit only
+        self.__log_tx_success_p = 0  # __log_total_delivered_packets
+        self.__log_tx_fail_per = 0  # __log_total_lost_packets
+        self.__log_tx_fail_collision = 0  # __log_total_collision_packets
+        self.__log_tx_fail_duplicate = 0  #
+        self.__log_tx_fail_buffer = 0  #
+
+        self.__log_sink_rx_success = 0
+        self.__log_sink_tx_success = 0
+        self.__log_sink_delay = []  # __log_end_to_end_delay
+        self.__log_sink_delay_avg = 0
 
     @property
     def node_id(self):
@@ -243,6 +261,7 @@ class SimNode:
     def recv_collision(self, value):
         self.__recv_collision = value
 
+    # START LOG SECTION
     @property
     def consumption(self):
         return self.__consumption
@@ -252,62 +271,180 @@ class SimNode:
         self.__consumption = value
 
     @property
-    def log_received_packet_ids(self):
-        return self.__log_received_packet_ids
+    def log_consumption_rx(self):
+        return self.__log_consumption_rx
 
-    def add_log_received_packet_ids(self, value):
-        self.__log_received_packet_ids.append(value)
-
-    @property
-    def log_total_received_packets(self):
-        return self.__log_total_received_packets
-
-    @log_total_received_packets.setter
-    def log_total_received_packets(self, value):
-        self.__log_total_received_packets = value
+    @log_consumption_rx.setter
+    def log_consumption_rx(self, value):
+        self.__log_consumption_rx = value
 
     @property
-    def log_total_delivered_packets(self):
-        return self.__log_total_delivered_packets
+    def log_consumption_tx(self):
+        return self.__log_consumption_tx
 
-    @log_total_delivered_packets.setter
-    def log_total_delivered_packets(self, value):
-        self.__log_total_delivered_packets = value
-
-    @property
-    def log_total_transmitted_packets(self):
-        return self.__log_total_transmitted_packets
-
-    @log_total_transmitted_packets.setter
-    def log_total_transmitted_packets(self, value):
-        self.__log_total_transmitted_packets = value
+    @log_consumption_tx.setter
+    def log_consumption_tx(self, value):
+        self.__log_consumption_tx = value
 
     @property
-    def log_total_lost_packets(self):
-        return self.__log_total_lost_packets
+    def log_consumption_standby(self):
+        return self.__log_consumption_standby
 
-    @log_total_lost_packets.setter
-    def log_total_lost_packets(self, value):
-        self.__log_total_lost_packets = value
-
-    @property
-    def log_total_collision_packets(self):
-        return self.__log_total_collision_packets
-
-    @log_total_collision_packets.setter
-    def log_total_collision_packets(self, value):
-        self.__log_total_collision_packets = value
+    @log_consumption_standby.setter
+    def log_consumption_standby(self, value):
+        self.__log_consumption_standby = value
 
     @property
-    def log_total_duplicat_packets(self):
-        return self.__log_total_duplicat_packets
+    def log_consumption_sleep(self):
+        return self.__log_consumption_sleep
 
-    @log_total_duplicat_packets.setter
-    def log_total_duplicat_packets(self, value):
-        self.__log_total_duplicat_packets = value
+    @log_consumption_sleep.setter
+    def log_consumption_sleep(self, value):
+        self.__log_consumption_sleep = value
 
+    # RX LOG SECTION
+    @property
+    def log_received_packets(self):
+        return self.__log_received_packets
 
+    def add_log_received_packets(self, value):
+        self.__log_received_packets.append(value)
 
+    @property
+    def log_rx_all_p(self):
+        return self.__log_rx_all_p
+
+    @log_rx_all_p.setter
+    def log_rx_all_p(self, value):
+        self.__log_rx_all_p = value
+
+    @property
+    def log_rx_fail_collision(self):
+        return self.__log_rx_fail_collision
+
+    @log_rx_fail_collision.setter
+    def log_rx_fail_collision(self, value):
+        self.__log_rx_fail_collision = value
+
+    @property
+    def log_rx_fail_duplicate(self):
+        return self.__log_rx_fail_duplicate
+
+    @log_rx_fail_duplicate.setter
+    def log_rx_fail_duplicate(self, value):
+        self.__log_rx_fail_duplicate = value
+
+    @property
+    def log_rx_fail_buffer(self):
+        return self.__log_rx_fail_buffer
+
+    @log_rx_fail_buffer.setter
+    def log_rx_fail_buffer(self, value):
+        self.__log_rx_fail_buffer = value
+
+    @property
+    def log_buffer_max(self):
+        return self.__log_buffer_max
+
+    @log_buffer_max.setter
+    def log_buffer_max(self, value):
+        self.__log_buffer_max = value
+
+    # TX LOG SECTION
+    @property
+    def log_gen_packets(self):
+        return self.__log_gen_packets
+
+    @log_gen_packets.setter
+    def log_gen_packets(self, value):
+        self.__log_gen_packets = value
+
+    @property
+    def log_tx_all_p(self):
+        return self.__log_tx_all_p
+
+    @log_tx_all_p.setter
+    def log_tx_all_p(self, value):
+        self.__log_tx_all_p = value
+
+    @property
+    def log_tx_links(self):
+        return self.__log_tx_links
+
+    @log_tx_links.setter
+    def log_tx_links(self, value):
+        self.__log_tx_links = value
+
+    @property
+    def log_tx_success_p(self):
+        return self.__log_tx_success_p
+
+    @log_tx_success_p.setter
+    def log_tx_success_p(self, value):
+        self.__log_tx_success_p = value
+
+    @property
+    def log_tx_fail_per(self):
+        return self.__log_tx_fail_per
+
+    @log_tx_fail_per.setter
+    def log_tx_fail_per(self, value):
+        self.__log_tx_fail_per = value
+
+    @property
+    def log_tx_fail_collision(self):
+        return self.__log_tx_fail_collision
+
+    @log_tx_fail_collision.setter
+    def log_tx_fail_collision(self, value):
+        self.__log_tx_fail_collision = value
+
+    @property
+    def log_tx_fail_duplicate(self):
+        return self.__log_tx_fail_duplicate
+
+    @log_tx_fail_duplicate.setter
+    def log_tx_fail_duplicate(self, value):
+        self.__log_tx_fail_duplicate = value
+
+    @property
+    def log_tx_fail_buffer(self):
+        return self.__log_tx_fail_buffer
+
+    @log_tx_fail_buffer.setter
+    def log_tx_fail_buffer(self, value):
+        self.__log_tx_fail_buffer = value
+
+    @property
+    def log_sink_delay(self):
+        return self.__log_sink_delay
+
+    def add_log_sink_delay(self, value):
+        self.__log_sink_delay.append(value)
+
+    @property
+    def log_sink_rx_success(self):
+        return self.__log_sink_rx_success
+
+    @log_sink_rx_success.setter
+    def log_sink_rx_success(self, value):
+        self.__log_sink_rx_success = value
+
+    @property
+    def log_sink_tx_success(self):
+        return self.__log_sink_tx_success
+
+    @log_sink_tx_success.setter
+    def log_sink_tx_success(self, value):
+        self.__log_sink_tx_success = value
+
+    @property
+    def log_sink_delay_avg(self):
+        return self.__log_sink_delay_avg
+
+    @log_sink_delay_avg.setter
+    def log_sink_delay_avg(self, value):
+        self.__log_sink_delay_avg = value
 
 
 # Class used as packet and for route data gathering during simulation

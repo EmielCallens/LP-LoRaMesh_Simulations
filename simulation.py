@@ -12,12 +12,34 @@ from lib.nodes import SimPacket
 from lib.param import ParamTopology as ParamT
 from setup import Sim1 as Sim
 
+# Network Logging Variables
+network_consumption = 0
+network_consumption_rx = 0
+network_consumption_tx = 0
+network_consumption_standby = 0
+network_consumption_sleep = 0
+network_sink_rx_success = 0  # delivered to sink only
+network_sink_tx_success = 0  # sink only transmissions
+network_delay = 0
+network_received = 0
+network_rx_col = 0
+network_rx_dup = 0
+network_rx_buf = 0
+network_rx_buf_max = 0
+network_gen_packets = 0
+network_transmitted = 0
+network_tx_success = 0
+network_tx_per = 0
+network_tx_col = 0
+network_tx_dup = 0
+network_tx_buf = 0
+
 
 simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n100_sf7_area3000x3000_id0.csv"
+file_networkMap = "networkTopology/n50_sf7_area500x500_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
@@ -107,8 +129,11 @@ def switch_mode(node):
 
     # END - RX_preamble
     if node.mode == 'RX_preamble':
-        # Start - RX_word
-        new_mode, new_time, new_consumption = modes.RX_word(node)
+        if len(node.recv_payload) == 0:
+            new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+        else:
+            # Start - RX_word
+            new_mode, new_time, new_consumption = modes.RX_word(node)
 
     # END - RX_word
     if node.mode == 'RX_word':
@@ -120,7 +145,11 @@ def switch_mode(node):
         # See if there was collision
         if node.recv_collision:
             # Start - STANDBY_stop
+            # print("ID",node.node_id,"header collision",node.recv_preamble,node.recv_payload)
             new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+            # clear recv_payload sleep should be longer then any payload transmission
+            for payload in node.recv_payload:
+                node.remove_recv_payload(payload)
         else:
             # Start - RX_address
             new_mode, new_time, new_consumption = modes.RX_address(node)
@@ -140,7 +169,11 @@ def switch_mode(node):
         # See if there was collision
         if node.recv_collision:
             # Start - STANDBY_stop because there was collision
+            # print("payload.collision")
             new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+            # clear recv_payload sleep should be longer then any payload transmission
+            for payload in node.recv_payload:
+                node.remove_recv_payload(payload)
 
         else:
             # Start - STANDBY_read there was no collision
@@ -209,10 +242,11 @@ def switch_mode(node):
 
     # END - TX_payload
     if node.mode == 'TX_payload':
+        # print("ID",node.node_id,"End Payload")
         # Start - STANDBY_stop
         new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
         # Log - packet transmitted
-        node.log_total_transmitted_packets += 1
+        node.log_tx_all_p += 1
 
     # END - SLEEP
     if node.mode == 'SLEEP':
@@ -227,23 +261,29 @@ def switch_mode(node):
 
 
 # Set Collision when neighbor node receive is active for TX_preamble and TX_payload (TX_word)
-def check_collision(receiver_node):
+def set_collision(receiver_node):
     # Receiving Payload
     if (receiver_node.mode == 'RX_word'
         or receiver_node.mode == 'RX_header'
         or receiver_node.mode == 'RX_address'
         or receiver_node.mode == 'RX_payload'):
         # Set collision for multiple signals
-        if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) > 1:
-            receiver_node.recv_collision = True
+        if Sim.preamble_channel():
+            if len(receiver_node.recv_payload) > 1:
+                receiver_node.recv_collision = True
+        else:
+            if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) > 1:
+                receiver_node.recv_collision = True
 
     # Not Receiving Payload
     else:
         # Clear collision when one or zero signals
-        if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) <= 1:
-            receiver_node.recv_collision = False
-
-    return receiver_node.recv_collision
+        if Sim.preamble_channel():
+            if len(receiver_node.recv_payload) <= 1:
+                receiver_node.recv_collision = False
+        else:
+            if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) <= 1:
+                receiver_node.recv_collision = False
 
 
 # Set Neighbors Preamble after PER check + collision if already receiving
@@ -251,15 +291,9 @@ def set_neighbors_preamble(nodes, transmitter_id):
     transmitter_node = nodes[transmitter_id]
     # Cycle through neighbors
     for n_id in transmitter_node.neighbors:
-        # Check PER to see if we reach the neighbor
-        per = round(transmitter_node.neighbors[n_id] * 100)  # Packet Error Ratio in %
-        rand_num = random.randrange(100)  # Random number between 0 and 100 in integers
-
-        if rand_num >= per:  # When random number is  higher than packet error ratio, receiver will hear it.
-            nodes[n_id].add_recv_preamble(transmitter_id)
-            nodes[n_id].recv_collision = check_collision(nodes[n_id])
-        else:
-            transmitter_node.log_total_lost_packets += 1
+        nodes[n_id].add_recv_preamble(transmitter_id)
+        set_collision(nodes[n_id])
+        nodes[n_id].log_rx_all_p += 1
 
         # Interrupt RX_timeout if preamble starts (no collision)
         if not nodes[n_id].recv_collision and nodes[n_id].mode == 'RX_timeout':
@@ -270,32 +304,44 @@ def set_neighbors_preamble(nodes, transmitter_id):
 def set_neighbors_payload(nodes, transmitter_id):
     transmitter_node = nodes[transmitter_id]
     for n_id in transmitter_node.neighbors:
-        if transmitter_id in nodes[n_id].recv_preamble:
-            nodes[n_id].remove_recv_preamble(transmitter_id)
+        # Stop preamble
+        nodes[n_id].remove_recv_preamble(transmitter_id)
+
+        # Check PER to see if we reach the neighbor without corruption
+        per = round(transmitter_node.neighbors[n_id] * 100)  # Packet Error Ratio in %
+        rand_num = random.randrange(100)  # Random number between 0 and 100 in integers
+        if rand_num >= per:  # When random number is  higher than packet error ratio, packet will arrive good
+            # print("Add payload",transmitter_node.node_id, "To ID",n_id)
             nodes[n_id].add_recv_payload(transmitter_node.payload_buffer[0])
-            #  Interrupt RX_preamble
-            if nodes[n_id].mode == 'RX_preamble':
-                nodes[n_id].mode_time = 0
+            transmitter_node.log_tx_links[n_id] += 1
+        else:
+            transmitter_node.log_tx_fail_per += 1
+
+        #  Interrupt RX_preamble
+        if nodes[n_id].mode == 'RX_preamble':
+            # print("interrupt preamble","ID",nodes[n_id].node_id,)
+            # reduce mode consumption by time left
+            remove_consumption = nodes[n_id].mode_time * ParamT.power_rx() * 10 ** -6
+            nodes[n_id].mode_consumption -= remove_consumption
+            nodes[n_id].mode_time = 0
 
 
 def add_packet_to_buffer(nodes, receiver_id):
-    # print("---- Receiver ID", receiver_id, "----")
-    # print("List Received PacketIDs", nodes[receiver_id].log_received_packet_ids)
     receiver_node = nodes[receiver_id]
 
     # Packet
+    # print("Remove payload", receiver_node.recv_payload[0].transmitter_id,"From ID", receiver_node.node_id, )
     received_packet = receiver_node.recv_payload[0]
     receiver_node.remove_recv_payload(receiver_node.recv_payload[0])
-    receiver_node.log_total_received_packets += 1
 
     # Check Packet ID for duplicate
-    if received_packet.packet_id not in receiver_node.log_received_packet_ids:
-        # print("Add packet", received_packet.packet_id,
-        #       "To node", receiver_node.node_id)
-        receiver_node.add_log_received_packet_ids(received_packet.packet_id)
-        # Tell Transmitter it was received (no link-layer) only for logging purpose
-        # print("Received packet Transmitter ID", received_packet.transmitter_id)
-        dict_simNodes[received_packet.transmitter_id].log_total_delivered_packets += 1
+    bool_no_duplicate = True
+    for p in receiver_node.log_received_packets:
+        if received_packet.packet_id == p.packet_id:
+            bool_no_duplicate = False
+    # Add packet to buffer if not duplicate
+    if bool_no_duplicate:
+
         # new packet (to prevent duplication problem)
         buffer_packet = SimPacket(received_packet.source_id,
                                   received_packet.source_timestamp,
@@ -308,15 +354,42 @@ def add_packet_to_buffer(nodes, receiver_id):
 
         # save payload
         if receiver_node.node_id != '0':
-            dict_simNodes[receiver_node.node_id].add_buffer(buffer_packet)
+            # Check if buffer is full
+            if len(receiver_node.payload_buffer) <= Sim.buffer_limit():
+                # Tell Transmitter it was received (no link-layer) only for logging purpose
+                nodes[received_packet.transmitter_id].log_tx_success_p += 1
+                # Log received packet
+                receiver_node.add_log_received_packets(received_packet)
+                # Store packet in payload buffer to transmit
+                receiver_node.add_buffer(buffer_packet)
+                # Sink Downlink (TX) was successful to this node
+                if received_packet.source_id == '0':
+                    receiver_node.log_sink_tx_success += 1
+
+                # Log buffer max size
+                if receiver_node.log_buffer_max < len(receiver_node.payload_buffer):
+                    receiver_node.log_buffer_max = len(receiver_node.payload_buffer)
+            # Packet rejected due to buffer full
+            else:
+                receiver_node.log_rx_fail_buffer += 1
+                nodes[received_packet.transmitter_id].log_tx_fail_buffer += 1
+
         else:
             # Packet arrived at sink, Log packet
-            print("Placeholder, PacketID", buffer_packet.packet_id, "Arrived at SINK")
+            # Tell transmitter it arrived successfully
+            nodes[received_packet.transmitter_id].log_tx_success_p += 1
+            # Record delay at source ID
+            tmp_sink_delay = simTime - buffer_packet.source_timestamp
+            nodes[received_packet.source_id].add_log_sink_delay(tmp_sink_delay)
+            # Tell Source that packet was delivered successfully to Sink
+            nodes[received_packet.source_id].log_sink_rx_success += 1
+            # Add Packet to Sink received packets
+            receiver_node.add_log_received_packets(received_packet)
 
     else:
-        # print("Duplicate packet ID", received_packet.packet_id)
-        # receiver_node.add_log_received_packet_ids(received_packet.packet_id)
-        nodes[received_packet.transmitter_id].log_total_duplicat_packets += 1
+        # Receiver records amount of duplicated packets received
+        nodes[receiver_id].log_rx_fail_duplicate += 1
+        nodes[received_packet.transmitter_id].log_tx_fail_duplicate += 1
 
 
 
@@ -340,6 +413,10 @@ for i in dict_networkNodes:
                                dict_networkNodes[i].activation_time,
                                dict_networkNodes[i].neighbors
                                )
+    # fill log link with neighbor nodes on startup
+    for neighbor_id in dict_simNodes[i].neighbors:
+        dict_simNodes[i].log_tx_links[neighbor_id] = 0
+
 
 # Simulation Loop
 sim_cycle = 0
@@ -413,7 +490,8 @@ while simTime <= simRuntime:
                     # Add packet to transmission buffer
                     dict_simNodes[i].add_buffer(new_packet)
                     # Add packet ID to transmitter 'receive' list to prevent from receiving again
-                    dict_simNodes[i].add_log_received_packet_ids(global_packet_serial)
+                    dict_simNodes[i].add_log_received_packets(new_packet)
+                    dict_simNodes[i].log_gen_packets += 1
                     # Set last time packet generated
                     dict_simNodes[i].time_gen_packet = dict_simNodes[i].internal_clock
                 else:
@@ -432,15 +510,68 @@ while simTime <= simRuntime:
 
     # Action management
     for node in list_actions:
+
         # Receiver Notify Transmitter that Packet was lost due to collision for logging
         if node.mode == 'RX_payload':
             if node.recv_collision:
                 # print("NodeID", node.node_id, "Collision Drop Packet with ID", node.recv_payload[0].packet_id)
                 for pl in node.recv_payload:
-                    dict_simNodes[pl.transmitter_id].log_total_collision_packets += 1
+                    dict_simNodes[pl.transmitter_id].log_tx_fail_collision += 1
+                    node.log_rx_fail_collision += 1
+        if node.mode == 'RX_header':
+            if node.recv_collision:
+                # print("ID",node.node_id, "Set Header Collision")
+                for pre in node.recv_payload:
+                    dict_simNodes[pre.transmitter_id].log_tx_fail_collision += 1
+                    node.log_rx_fail_collision += 1
 
-        # Switch Modes
+        # No Link-Layer ACK
+        if not Sim.link_layer_ack():
+            # Transmitter delete packet after sending
+            if dict_simNodes[node.node_id].mode == 'TX_payload':
+                dict_simNodes[node.node_id].remove_buffer(dict_simNodes[node.node_id].payload_buffer[0])
+
+            # Receiver Notify Transmitter - Packet Successfully Received
+            if dict_simNodes[node.node_id].mode == 'STANDBY_read':
+                add_packet_to_buffer(dict_simNodes, node.node_id)
+
+        # Link-Layer ACK - Receiver reply, with receiver reply
+        # Not for broadcast packets
+        else:
+            print("No Link-Layer ACK Implemented")
+
+        # Add consumption for Logging
+        if (node.mode == 'RX_timeout'
+                or node.mode == 'RX_sync'
+                or node.mode == 'RX_preamble'
+                or node.mode == 'RX_word'
+                or node.mode == 'RX_header'
+                or node.mode == 'RX_address'
+                or node.mode == 'RX_payload'):
+            dict_simNodes[node.node_id].log_consumption_rx += node.mode_consumption
+
+        if node.mode == 'CAD':
+            dict_simNodes[node.node_id].log_consumption_rx += node.mode_consumption
+
+        if (node.mode == 'TX_preamble'
+                or node.mode == 'TX_word'
+                or node.mode == 'TX_payload'):
+            dict_simNodes[node.node_id].log_consumption_tx += node.mode_consumption
+
+        if (node.mode == 'STANDBY_start'
+                or node.mode == 'STANDBY_write'
+                or node.mode == 'STANDBY_read'
+                or node.mode == 'STANDBY_clear'
+                or node.mode == 'STANDBY_detected'
+                or node.mode == 'STANDBY_stop'):
+            dict_simNodes[node.node_id].log_consumption_standby += node.mode_consumption
+
+        if node.mode == 'SLEEP':
+            dict_simNodes[node.node_id].log_consumption_sleep += node.mode_consumption
+
         dict_simNodes[node.node_id].consumption += node.mode_consumption  # add previous mode consumption
+        dict_simNodes[node.node_id].mode_consumption = 0
+        # Switch Modes
         dict_simNodes[node.node_id] = switch_mode(node)
 
         # Transmitter Notify Neighbor - Preamble
@@ -451,64 +582,189 @@ while simTime <= simRuntime:
         if dict_simNodes[node.node_id].mode == 'TX_word':
             set_neighbors_payload(dict_simNodes, node.node_id)
 
-        # No Link-Layer ACK
-        if not Sim.link_layer_ack():
-            # Transmitter delete packet after sending
-            if dict_simNodes[node.node_id].mode == 'TX_payload':
-                dict_simNodes[node.node_id].remove_buffer(dict_simNodes[node.node_id].payload_buffer[0])
-            # Receiver Notify Transmitter - Packet Successfully Received
-            if dict_simNodes[node.node_id].mode == 'STANDBY_read':
-                add_packet_to_buffer(dict_simNodes, node.node_id)
+        # Receiver Check Collision when RX_word starts
+        if dict_simNodes[node.node_id].mode == 'RX_word':
+            set_collision(node)
 
-        # Link-Layer ACK - Receiver reply, with receiver reply
-        # Not for broadcast packets
-        else:
-            print("No Link-Layer ACK Implemented")
-
-    # Hourly Log Management
-    if hour_log >= 60 * 60 * 10**6:
-        hour_log = 0
-        # Open Network file and save hour data
-        # Open Node files and save hour data
-        # For debug
-        print("One Hour passed, Log Data")
-
-        for i in dict_simNodes:
-            print("ID", dict_simNodes[i].node_id,"delivered packets", dict_simNodes[i].log_total_delivered_packets)
-            # print("consumption", dict_simNodes[i].consumption)
 
     # Increase timer by microseconds to next network action and print node actions to individual Log
     sim_cycle += 1
 
-    # print progress for debug
-    if simTime - previous_print >= 15 * 10**6:
+    # print progress for debug every 5min
+    if simTime - previous_print >= 5 * 60 * 10**6:
         print("Sim Cycle:", sim_cycle, " ", round((simTime / simRuntime)*100), "%")
         previous_print = simTime
 
-# Simulation - End Logging
+# End Simulation - Logging
 print("End Simulation")
 for i in dict_simNodes:
+    '''
     print("---- ID", dict_simNodes[i].node_id, "Consumption", dict_simNodes[i].consumption, "-------------------")
-    print("Received packet IDs", dict_simNodes[i].log_received_packet_ids)
-    print("Total received packets", dict_simNodes[i].log_total_received_packets)
-    print("Total transmitted packets", dict_simNodes[i].log_total_transmitted_packets,
-          "multi neighbors", len(dict_simNodes[i].neighbors) * dict_simNodes[i].log_total_transmitted_packets)
-    print("Total delivered packets", dict_simNodes[i].log_total_delivered_packets)
-    print("Lost packets", dict_simNodes[i].log_total_lost_packets)
-    print("Collision packets", dict_simNodes[i].log_total_collision_packets)
-    print("Duplicate packets", dict_simNodes[i].log_total_duplicat_packets)
+    print_txt = ""
+    for p in dict_simNodes[i].log_received_packets:
+        if p.source_id != dict_simNodes[i].node_id:
+            print_txt += str(p.packet_id) + ";"
+    print("Received packet IDs", print_txt)
+    print("Received packet", dict_simNodes[i].log_received_packets)
 
-print("------------------ SINK --------------------------")
+    print("Total received packets", dict_simNodes[i].log_rx_all_p)
+    print("Total transmitted packets", dict_simNodes[i].log_tx_all_p,
+          "multi neighbors", len(dict_simNodes[i].neighbors) * dict_simNodes[i].log_tx_all_p)
+    print("Total delivered packets", dict_simNodes[i].log_tx_success_p)
+    print("Lost Send packets", dict_simNodes[i].log_tx_fail_per)
+    print("Collision Send packets", dict_simNodes[i].log_tx_fail_collision)
+    print("Duplicate Received packets", dict_simNodes[i].log_rx_fail_duplicate)
+    print("Buffer Full Received packets", dict_simNodes[i].log_rx_fail_buffer)
+    print("Max Buffer Measured", dict_simNodes[i].log_buffer_max)
+    print("Links", dict_simNodes[i].log_tx_links)
 
-print("---- ID", dict_simNodes['0'].node_id, "Consumption", dict_simNodes['0'].consumption, "-------------------")
-print("Received packet IDs", dict_simNodes['0'].log_received_packet_ids)
-print("Total received packets", dict_simNodes['0'].log_total_received_packets)
-print("Total transmitted packets", dict_simNodes['0'].log_total_transmitted_packets,
-      "multi neighbors", len(dict_simNodes['0'].neighbors) * dict_simNodes['0'].log_total_transmitted_packets)
-print("Total delivered packets", dict_simNodes['0'].log_total_delivered_packets)
-print("Lost packets", dict_simNodes['0'].log_total_lost_packets)
-print("Collision packets", dict_simNodes['0'].log_total_collision_packets)
-print("Duplicate packets", dict_simNodes['0'].log_total_duplicat_packets)
+    print("log_sink_rx_success",dict_simNodes[i].log_sink_rx_success)
+    print("log_sink_tx_success", dict_simNodes[i].log_sink_tx_success)
+    '''
+    # Calculate Node average end-to-end delay for uplink
+    # avg delay
+    for d in dict_simNodes[i].log_sink_delay:
+        dict_simNodes[i].log_sink_delay_avg += d
+    if len(dict_simNodes[i].log_sink_delay) > 0:
+        dict_simNodes[i].log_sink_delay_avg = dict_simNodes[i].log_sink_delay_avg / len(dict_simNodes[i].log_sink_delay)
+    else:
+        dict_simNodes[i].log_sink_delay_avg = 0
+    # print("Average Delay of Node to Sink", dict_simNodes[i].log_sink_delay_avg)
+
+    # Calculate Total network variables
+    network_consumption += dict_simNodes[i].consumption / 1000  # in Joules
+    network_consumption_rx = dict_simNodes[i].log_consumption_rx / 1000  # in Joules
+    network_consumption_tx = dict_simNodes[i].log_consumption_tx / 1000  # in Joules
+    network_consumption_standby = dict_simNodes[i].log_consumption_standby / 1000  # in Joules
+    network_consumption_sleep = dict_simNodes[i].log_consumption_sleep / 1000  # in Joules
+
+    network_sink_rx_success += dict_simNodes[i].log_sink_rx_success
+    network_sink_tx_success += dict_simNodes[i].log_sink_tx_success
+
+    network_received += dict_simNodes[i].log_rx_all_p
+    network_rx_col += dict_simNodes[i].log_rx_fail_collision
+    network_rx_dup += dict_simNodes[i].log_rx_fail_duplicate
+    network_rx_buf += dict_simNodes[i].log_rx_fail_buffer
+    if network_rx_buf_max < dict_simNodes[i].log_buffer_max:
+        network_rx_buf_max = dict_simNodes[i].log_buffer_max
+
+    network_gen_packets += dict_simNodes[i].log_gen_packets
+    network_transmitted += dict_simNodes[i].log_tx_all_p
+    network_tx_success += dict_simNodes[i].log_tx_success_p
+    network_tx_per += dict_simNodes[i].log_tx_fail_per
+    network_tx_col += dict_simNodes[i].log_tx_fail_collision
+    network_tx_dup += dict_simNodes[i].log_tx_fail_duplicate
+    network_tx_buf += dict_simNodes[i].log_tx_fail_buffer
+
+    if i != '0':
+        network_delay += dict_simNodes[i].log_sink_delay_avg
+
+# Network Sink Delay Calculation statistics
+if len(dict_simNodes) - 1 > 0:
+    network_delay = network_delay / (len(dict_simNodes) - 1)  # calculate average
+else:
+    network_delay = 0
+
+# Network Logging
+print("------------------ Network --------------------------")
+print("Network Consumption", network_consumption)
+print("Network Unique Sink Delivered packets", network_sink_rx_success)
+print("Network Nodes received total packets from Sink", network_sink_tx_success)
+print("Network average end-to-end delay", network_delay)
+print("Network Received packets", network_received)
+print("Network Collision Received packets", network_rx_col)
+print("Network Received Duplicates packets", network_rx_dup)
+print("Network Received Lost Due to Buffer Full packets", network_rx_buf)
+print("Network Buffer filled Max", network_rx_buf_max)
+
+print("Network Generated packets", network_gen_packets)
+print("Network Transmitted packets", network_transmitted)
+print("Network Transmitted packets that where successfully received", network_tx_success)
+print("Network Lost packets", network_tx_per)
+print("Network Transmitted Collision  packets", network_tx_col)
+print("Network Transmitted Duplicates packets", network_tx_dup)
+print("Network Transmitted Lost Due to Buffer Full packets", network_tx_buf)
+
+# Write CSV File - General
+# Columns
+# node_id ; consumption; sink_success; sink_delay_avg
+# rx_all_p; rx_fail_col; rx_fail_dup; rx_fail_buf; rx_buf_max;
+# gen_p; tx_all_p; tx_success_p; tx_fail_per; tx_fail_col; tx_fail_dup; tx_fail_buf
+# links;
+# Rows
+# Network; Sink; ...
+
+with open(sim_folder_path + "/data.csv", mode="w", newline='') as csvfile:
+    fieldnames = ['node_id', 'consumption', 'con_rx', 'con_tx', 'con_standby', 'con_sleep','sink_rx_success', 'sink_tx_success', 'sink_delay_avg',
+                  'rx_all_p', 'rx_fail_col', 'rx_fail_dup', 'rx_fail_buf', 'rx_buf_max',
+                  'gen_p', 'tx_all_p', 'tx_success_p', 'tx_fail_per', 'tx_fail_col', 'tx_fail_dup', 'tx_fail_buf',
+                  'links']
+
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+    writer.writeheader()
+
+    # Write Row1 - Network Log
+    dict_network_row = {
+        'node_id': 'Network',
+        'consumption': network_consumption,
+        'con_rx': network_consumption_rx,
+        'con_tx': network_consumption_tx,
+        'con_standby': network_consumption_standby,
+        'con_sleep': network_consumption_sleep,
+        'sink_rx_success': network_sink_rx_success,
+        'sink_tx_success': network_sink_tx_success,
+        'sink_delay_avg': network_delay,
+        'rx_all_p': network_received,
+        'rx_fail_col': network_rx_col,
+        'rx_fail_dup': network_rx_dup,
+        'rx_fail_buf': network_rx_buf,
+        'rx_buf_max': network_rx_buf_max,
+        'gen_p': network_gen_packets,
+        'tx_all_p': network_transmitted,
+        'tx_success_p': network_tx_success,
+        'tx_fail_per': network_tx_per,
+        'tx_fail_col': network_tx_col,
+        'tx_fail_dup': network_tx_dup,
+        'tx_fail_buf': network_tx_buf,
+        'links': ''
+    }
+    writer.writerow(dict_network_row)
+
+    # Write Other Row - Node Log
+    for i in dict_simNodes:
+
+        # All Transmission (All transmissions * neighbors - lost due to per)
+        txt_tx_all_p = dict_simNodes[i].log_tx_all_p * len(dict_simNodes[i].neighbors) - dict_simNodes[i].log_tx_fail_per
+        txt_tx_all_p = str(txt_tx_all_p)
+
+        dict_node_row = {
+            'node_id': dict_simNodes[i].node_id,
+            'consumption': dict_simNodes[i].consumption,
+            'con_rx': dict_simNodes[i].log_consumption_rx,
+            'con_tx': dict_simNodes[i].log_consumption_tx,
+            'con_standby': dict_simNodes[i].log_consumption_standby,
+            'con_sleep': dict_simNodes[i].log_consumption_sleep,
+            'sink_rx_success': dict_simNodes[i].log_sink_rx_success,
+            'sink_tx_success': dict_simNodes[i].log_sink_tx_success,
+            'sink_delay_avg': dict_simNodes[i].log_sink_delay_avg,
+            'rx_all_p': dict_simNodes[i].log_rx_all_p,
+            'rx_fail_col': dict_simNodes[i].log_rx_fail_collision,
+            'rx_fail_dup': dict_simNodes[i].log_rx_fail_duplicate,
+            'rx_fail_buf': dict_simNodes[i].log_rx_fail_buffer,
+            'rx_buf_max': dict_simNodes[i].log_buffer_max,
+            'gen_p': dict_simNodes[i].log_gen_packets,
+            'tx_all_p': str(dict_simNodes[i].log_tx_all_p) + "; " + txt_tx_all_p,
+            'tx_success_p':  dict_simNodes[i].log_tx_success_p,
+            'tx_fail_per': dict_simNodes[i].log_tx_fail_per,
+            'tx_fail_col': dict_simNodes[i].log_tx_fail_collision,
+            'tx_fail_dup': dict_simNodes[i].log_tx_fail_duplicate,
+            'tx_fail_buf': dict_simNodes[i].log_tx_fail_buffer,
+            'links': dict_simNodes[i].log_tx_links
+        }
+
+        writer.writerow(dict_node_row)
+
+
 
 
 

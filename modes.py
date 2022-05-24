@@ -139,6 +139,7 @@ def STANDBY_stop(node):
 
 # --------- Transmit Modes --------- ---------
 def TX_preamble(node):
+    # print("ID",node.node_id,"Preamble")
     mode = 'TX_preamble'
     time = Sim.time_preamble()
     consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
@@ -146,6 +147,7 @@ def TX_preamble(node):
 
 
 def TX_word(node):
+    # print("ID",node.node_id,"Payload")
     mode = 'TX_word'
     time = Sim.time_rx_syncword()
     consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
@@ -169,7 +171,14 @@ def SLEEP(node):
         time -= Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
     # Switch to STANDBY_start
     time += Sim.time_reg_1()
-    consumption = time * ParamT.power_sleep()
+    consumption = time * ParamT.power_sleep() * 10 ** -6
+
+    # If Collision was detected Node waits one extra cycle before trying to transmit
+    if node.recv_collision and len(node.payload_buffer) > 0:
+        time += Sim.time_cycle()
+        if node.clock_drift != 0:
+            time += Sim.time_cycle() / (node.clock_drift * 10 ** 6)
+
     # Remove collision if it wasn't cleared because it happened in receive mode
     if len(node.recv_preamble) + len(node.recv_payload) <= 1:
         node.recv_collision = False

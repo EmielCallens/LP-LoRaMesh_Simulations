@@ -18,7 +18,7 @@ class Sim1:
 
     @staticmethod
     def runtime():
-        return 1000*1000*60*60 + 1000*1000*60*30   # run for 90min, in microseconds
+        return 1000*1000*60*60 * 1.5   # run for 24h, in microseconds
 
     @staticmethod
     def ih():
@@ -53,7 +53,8 @@ class Sim1:
 
     @staticmethod
     def n_cycle():
-        return 13402  # sample period, in symbols
+        # return 13402  # sample period, in symbols
+        return 1002
 
     @staticmethod
     def time_cycle():
@@ -61,8 +62,8 @@ class Sim1:
 
     @staticmethod
     def n_preamble():
-        return 13404  # preamble length in symbols
-
+        # return 13404  # preamble length in symbols
+        return 1004
     @staticmethod
     def time_preamble():
         return Sim1.n_preamble() * ParamT.time_symbol()[Sim1.sf()]  # preamble length in µs
@@ -80,11 +81,15 @@ class Sim1:
         return 'RX'  # options: CAD, RX
 
     @staticmethod
+    def preamble_channel():
+        return False  # options: True, False
+
+    @staticmethod
     def rate_spi():
         return 115200 * 8 / 10  # Baud *8 (to get bit) /10 (number of Baud needed for 1 byte)
 
     @staticmethod
-    def buffer_size():
+    def buffer_limit():
         return 20  # number of packets the platform can hold onto (includes mesh header)
 
     @staticmethod
@@ -108,17 +113,17 @@ class Sim1:
 
     @staticmethod
     def time_reg_payload_255():
-        return round(((Sim1.payload() + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+        return round(((Sim1.payload() * 8 + 8) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
 
     @staticmethod
     def time_reg_payload_mheader():
         # Might want to add more than mesh header for some protocols
-        return round(((Sim1.byte_mesh_header() + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+        return round(((Sim1.byte_mesh_header() + 8) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
 
     @staticmethod
     def time_reg_payload_value(value):
         # custom payload size in bytes
-        return round(((value + 1) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
+        return round(((value + 8) / Sim1.rate_spi()) * 10 ** 6)  # time in µs (add 10^6 for sec to µs)
 
     @staticmethod
     def time_rx_timeout():
@@ -170,7 +175,7 @@ class Sim1:
             'link_layer_ack': Sim1.link_layer_ack(),
             'detection_mode': Sim1.detection_mode(),
             'rate_spi': Sim1.rate_spi(),
-            'buffer_size': Sim1.buffer_size(),
+            'buffer_size': Sim1.buffer_limit(),
             'mesh_header': Sim1.mesh_header(),
             'byte_mesh_header': Sim1.byte_mesh_header(),
             'time_reg_1': Sim1.time_reg_1(),
