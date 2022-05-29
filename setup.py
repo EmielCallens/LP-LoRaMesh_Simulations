@@ -21,52 +21,18 @@ class Sim1:
         return 1000*1000*60*60 * 1.5   # run for 24h, in microseconds
 
     @staticmethod
-    def ih():
-        return 0  # options: 0 = explicit, 1 = implicit
-
-    @staticmethod
-    def crc():
-        return 1  # options: 0=off, 1=on
-
-    @staticmethod
-    def cr():
-        return 1  # options: 1=4/5, 2=4/6, 3=4/7, 4=4/8 for overhead ratio 1.25, 1.5, 1.75, 2
-
-    @staticmethod
-    def de():
-        return 0  # options: 1 if SF 12, low data-rate optimization
-
-    @staticmethod
-    def payload():
-        return 255  # options: 1-255 bytes
-
-    @staticmethod
-    def n_payload_max():
-        n_payload = ParamT.n_payload_calc([Sim1.payload(), Sim1.sf(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
-        return n_payload  # options: 1-255 bytes
-
-    @staticmethod
-    def n_payload_min():
-        n_payload = ParamT.n_payload_calc([Sim1.byte_mesh_header(), Sim1.sf(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
-        return n_payload  # options: 1-255 bytes
-
+    def packet_gen_rate():
+        return 1 * 60 * 60 * 10 ** 6  # 1hour, in microseconds
 
     @staticmethod
     def n_cycle():
         # return 13402  # sample period, in symbols
-        return 1002
-
-    @staticmethod
-    def time_cycle():
-        return Sim1.n_cycle() * ParamT.time_symbol()[Sim1.sf()]  # sample period, in µs
+        return 13402
 
     @staticmethod
     def n_preamble():
         # return 13404  # preamble length in symbols
-        return 1004
-    @staticmethod
-    def time_preamble():
-        return Sim1.n_preamble() * ParamT.time_symbol()[Sim1.sf()]  # preamble length in µs
+        return 13404
 
     @staticmethod
     def target():
@@ -85,20 +51,58 @@ class Sim1:
         return False  # options: True, False
 
     @staticmethod
-    def rate_spi():
-        return 115200 * 8 / 10  # Baud *8 (to get bit) /10 (number of Baud needed for 1 byte)
-
-    @staticmethod
-    def buffer_limit():
-        return 20  # number of packets the platform can hold onto (includes mesh header)
+    def byte_mesh_header():
+        return 2  # options: total number of mesh header bytes for this protocol
 
     @staticmethod
     def mesh_header():
         return ['sourceID']  # options: targetID, sourceID, destinationID, transmitterID, hop_count
 
     @staticmethod
-    def byte_mesh_header():
-        return 2  # options: total number of mesh header bytes for this protocol
+    def buffer_limit():
+        return 20  # number of packets the platform can hold onto (includes mesh header)
+
+    @staticmethod
+    def payload():
+        return 255  # options: 1-255 bytes
+
+    @staticmethod
+    def ih():
+        return 0  # options: 0 = explicit, 1 = implicit
+
+    @staticmethod
+    def crc():
+        return 1  # options: 0=off, 1=on
+
+    @staticmethod
+    def cr():
+        return 1  # options: 1=4/5, 2=4/6, 3=4/7, 4=4/8 for overhead ratio 1.25, 1.5, 1.75, 2
+
+    @staticmethod
+    def de():
+        return 0  # options: 1 if SF 12, low data-rate optimization
+
+    @staticmethod
+    def n_payload_max():
+        n_payload = ParamT.n_payload_calc([Sim1.payload(), Sim1.sf(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
+        return n_payload  # options: 1-255 bytes
+
+    @staticmethod
+    def n_payload_min():
+        n_payload = ParamT.n_payload_calc([Sim1.byte_mesh_header(), Sim1.sf(), Sim1.ih(), Sim1.crc(), Sim1.de(), Sim1.cr()])
+        return n_payload  # options: 1-255 bytes
+
+    @staticmethod
+    def time_cycle():
+        return Sim1.n_cycle() * ParamT.time_symbol()[Sim1.sf()]  # sample period, in µs
+
+    @staticmethod
+    def time_preamble():
+        return Sim1.n_preamble() * ParamT.time_symbol()[Sim1.sf()]  # preamble length in µs
+
+    @staticmethod
+    def rate_spi():
+        return 115200 * 8 / 10  # Baud *8 (to get bit) /10 (number of Baud needed for 1 byte)
 
     # All mode switch delays
     @staticmethod
@@ -160,24 +164,26 @@ class Sim1:
             'ptx': Sim1.ptx(),
             'env': Sim1.env(),
             'runtime': Sim1.runtime(),
+            'packet_gen_rate': Sim1.packet_gen_rate(),
+            'n_cycle': Sim1.n_cycle(),
+            'n_preamble': Sim1.n_preamble(),
+            'target': Sim1.target(),
+            'link_layer_ack': Sim1.link_layer_ack(),
+            'detection_mode': Sim1.detection_mode(),
+            'preamble_channel': Sim1.preamble_channel(),
+            'byte_mesh_header': Sim1.byte_mesh_header(),
+            'mesh_header': Sim1.mesh_header(),
+            'buffer_limit': Sim1.buffer_limit(),
+            'payload': Sim1.payload(),
             'ih': Sim1.ih(),
             'crc': Sim1.crc(),
             'cr': Sim1.cr(),
             'de': Sim1.de(),
-            'payload': Sim1.payload(),
             'n_payload_max': Sim1.n_payload_max(),
             'n_payload_min': Sim1.n_payload_min(),
-            'n_cycle': Sim1.n_cycle(),
             'time_cycle': Sim1.time_cycle(),
-            'n_preamble': Sim1.n_preamble(),
             'time_preamble': Sim1.time_preamble(),
-            'target': Sim1.target(),
-            'link_layer_ack': Sim1.link_layer_ack(),
-            'detection_mode': Sim1.detection_mode(),
             'rate_spi': Sim1.rate_spi(),
-            'buffer_size': Sim1.buffer_limit(),
-            'mesh_header': Sim1.mesh_header(),
-            'byte_mesh_header': Sim1.byte_mesh_header(),
             'time_reg_1': Sim1.time_reg_1(),
             'time_reg_2': Sim1.time_reg_2(),
             'time_reg_payload_255': Sim1.time_reg_payload_255(),

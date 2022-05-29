@@ -34,7 +34,7 @@ network_tx_col = 0
 network_tx_dup = 0
 network_tx_buf = 0
 
-
+# Sim Time Variables
 simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
@@ -260,6 +260,149 @@ def switch_mode(node):
     return node
 
 
+# Actions when a mode ends
+def action_end_mode(action_node):
+
+    # --- RX ---
+    if action_node.mode == 'RX_timeout':
+
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'RX_sync':
+
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'RX_preamble':
+
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'RX_word':
+
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'RX_header':
+
+        '''
+        # Collision Actions
+        if action_node.recv_collision:
+            for packet in action_node.recv_payload:
+                # Remove payloads
+                action_node.remove_recv_payload(packet)
+                # Logging Collision
+                dict_simNodes[packet.transmitter_id].log_tx_fail_collision += 1
+                action_node.log_rx_fail_collision += 1
+                '''
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'RX_address':
+        # Logging Rejected
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'RX_payload':
+
+        # Collision Actions
+        if action_node.recv_collision:
+            for packet in action_node.recv_payload:
+                # Remove payloads
+                action_node.remove_recv_payload(packet)
+                # Logging Collision
+                dict_simNodes[packet.transmitter_id].log_tx_fail_collision += 1
+                action_node.log_rx_fail_collision += 1
+
+        # Logging Consumption
+        action_node.log_consumption_rx += action_node.mode_consumption
+    elif action_node.mode == 'CAD':
+
+        # Consumption Logging
+        action_node.log_consumption_rx += action_node.mode_consumption
+
+    # --- TX ---
+    elif action_node.mode == 'TX_preamble':
+
+        # Consumption Logging
+        action_node.log_consumption_tx += action_node.mode_consumption
+    elif action_node.mode == 'TX_word':
+
+        # Consumption Logging
+        action_node.log_consumption_tx += action_node.mode_consumption
+    elif action_node.mode == 'TX_payload':
+
+        # Consumption Logging
+        action_node.log_consumption_tx += action_node.mode_consumption
+
+    # --- STANDBY ---
+    elif action_node.mode == 'STANDBY_start':
+
+        # Consumption Logging
+        action_node.log_consumption_standby += action_node.mode_consumption
+    elif action_node.mode == 'STANDBY_write':
+
+        # Consumption Logging
+        action_node.log_consumption_standby += action_node.mode_consumption
+    elif action_node.mode == 'STANDBY_read':
+
+        # Consumption Logging
+        action_node.log_consumption_standby += action_node.mode_consumption
+    elif action_node.mode == 'STANDBY_clear':
+
+        # Consumption Logging
+        action_node.log_consumption_standby += action_node.mode_consumption
+    elif action_node.mode == 'STANDBY_detected':
+
+        # Consumption Logging
+        action_node.log_consumption_standby += action_node.mode_consumption
+    elif action_node.mode == 'STANDBY_stop':
+
+        # Consumption Logging
+        action_node.log_consumption_standby += action_node.mode_consumption
+
+    # --- SLEEP ---
+    elif action_node.mode == 'SLEEP':
+
+        # Consumption Logging
+        action_node.log_consumption_sleep += action_node.mode_consumption
+
+    # --- POWER_OFF ---
+    elif action_node.mode == 'POWER_OFF':
+        print("No actions for Power_Off for now")
+
+    else:
+        print("Action End of Mode, Mode doesn't exist", action_node.mode)
+
+    # --- General Actions ---
+    # Log Consumption
+    action_node.consumption += action_node.mode_consumption
+    # Reset Consumption
+    action_node.mode_consumption = 0
+
+    '''
+            
+            if action_node.mode == 'RX_header':
+                if action_node.recv_collision:
+                    # print("ID",node.node_id, "Set Header Collision")
+                    for pre in action_node.recv_payload:
+                        dict_simNodes[pre.transmitter_id].log_tx_fail_collision += 1
+                        action_node.log_rx_fail_collision += 1
+
+            # No Link-Layer ACK
+            if not Sim.link_layer_ack():
+                # Transmitter delete packet after sending
+                if dict_simNodes[action_node.node_id].mode == 'TX_payload':
+                    dict_simNodes[action_node.node_id].remove_buffer(dict_simNodes[action_node.node_id].payload_buffer[0])
+
+                # Receiver Notify Transmitter - Packet Successfully Received
+                if dict_simNodes[action_node.node_id].mode == 'STANDBY_read':
+                    add_packet_to_buffer(dict_simNodes, action_node.node_id)
+
+            # Link-Layer ACK - Receiver reply, with receiver reply
+            # Not for broadcast packets
+            else:
+                print("No Link-Layer ACK Implemented")
+
+            '''
+
+
+
 # Set Collision when neighbor node receive is active for TX_preamble and TX_payload (TX_word)
 def set_collision(receiver_node):
     # Receiving Payload
@@ -324,6 +467,35 @@ def set_neighbors_payload(nodes, transmitter_id):
             remove_consumption = nodes[n_id].mode_time * ParamT.power_rx() * 10 ** -6
             nodes[n_id].mode_consumption -= remove_consumption
             nodes[n_id].mode_time = 0
+
+
+def gen_packet(packet_node, serial_no):
+
+    # Add packet for Broadcast target
+    if Sim.target() == 'broadcast':
+        # Sink Node
+        if packet_node.node_id == 0:
+            new_packet = SimPacket(packet_node.node_id,
+                                   simTime + delta_time,
+                                   Sim.payload(),
+                                   'broadcast',
+                                   'all',
+                                   serial_no)
+        # Other Nodes
+        else:
+            new_packet = SimPacket(packet_node.node_id,
+                                   simTime + delta_time,
+                                   Sim.payload(),
+                                   'broadcast',
+                                   'sink',
+                                   serial_no)
+
+    # Other target types
+    else:
+        # look up routing table for next hop target to destination
+        print("Not Implemented Yet")
+
+    return new_packet
 
 
 def add_packet_to_buffer(nodes, receiver_id):
@@ -421,20 +593,21 @@ for i in dict_networkNodes:
 # Simulation Loop
 sim_cycle = 0
 previous_print = 0
-hour_log = 0
 global_packet_serial = 0
 while simTime <= simRuntime:
     delta_time = simRuntime  # max time to go as start of delta time this loop
+    simTime += delta_time
     list_actions = []  # list of nodes that have an action this loop
-    # Time management
+
+    # Time management --------------------------------------------------------------------------------------------------
+    # Global Minimum Mode Time (delta_time)
     for i in dict_simNodes:
         if dict_simNodes[i].mode_time < delta_time:
             # look for lowest value delta_time in global time
             delta_time = dict_simNodes[i].mode_time
 
     for i in dict_simNodes:
-
-        # Change passed network time to passed node time
+        # Local Node Time (delta_time_drift)
         if dict_simNodes[i].clock_drift != 0:
             delta_time_drift = delta_time + delta_time / (dict_simNodes[i].clock_drift * 10 ** 6)
         else:
@@ -442,11 +615,12 @@ while simTime <= simRuntime:
 
         # Mode Time (external, network time)
         dict_simNodes[i].mode_time -= delta_time
-
         # Add node clock (internal)
         dict_simNodes[i].internal_clock += delta_time_drift
-
         # Cycle Time (internal)
+        dict_simNodes[i].cycle_time -= delta_time_drift
+        '''
+        # Restart when reach below 0
         if dict_simNodes[i].cycle_time - delta_time_drift <= 0:
             # Check Buffer to set early wake-up for transmitting
             if len(dict_simNodes[i].payload_buffer) == 0:
@@ -465,129 +639,52 @@ while simTime <= simRuntime:
         else:
             # Decrease Cycle Time
             dict_simNodes[i].cycle_time -= delta_time_drift  # subtract loop time period from all cycle_times
+        '''
 
-        # Generate packet every 1hour of internal clock time
-        if dict_simNodes[i].internal_clock >= dict_simNodes[i].time_gen_packet + 60*60 * 10**6:
+        # Generate packet ----------------------------------------------------------------------------------------------
+        # Generate packet every x-hours of internal clock time
+        if dict_simNodes[i].internal_clock >= dict_simNodes[i].time_gen_packet + Sim.packet_gen_rate():
             # During SLEEP Add packet to buffer
             if dict_simNodes[i].mode == 'SLEEP':
-                # Add packet to buffer with correct mesh header and payload length information +
-                if Sim.target() == 'broadcast':
-                    # print("New Packet SourceID", dict_simNodes[i].node_id, "PacketID", global_packet_serial)
-                    if dict_simNodes[i].node_id != 0:  # Normal nodes target sink
-                        new_packet = SimPacket(dict_simNodes[i].node_id,
-                                               simTime + delta_time,
-                                               Sim.payload(),
-                                               'broadcast',
-                                               'sink',
-                                               global_packet_serial)
-                    else:  # For Sink, target all nodes
-                        new_packet = SimPacket(dict_simNodes[i].node_id,
-                                               simTime + delta_time,
-                                               Sim.payload(),
-                                               'broadcast',
-                                               'all',
-                                               global_packet_serial)
-                    # Add packet to transmission buffer
-                    dict_simNodes[i].add_buffer(new_packet)
-                    # Add packet ID to transmitter 'receive' list to prevent from receiving again
-                    dict_simNodes[i].add_log_received_packets(new_packet)
-                    dict_simNodes[i].log_gen_packets += 1
-                    # Set last time packet generated
-                    dict_simNodes[i].time_gen_packet = dict_simNodes[i].internal_clock
-                else:
-                    # look up routing table for next hop target to destination
-                    print("Not Implemented Yet")
-                # Packet made increase serial number
                 global_packet_serial += 1
+                new_packet = gen_packet(dict_simNodes[i], global_packet_serial)
+                # Add packet to transmission buffer
+                dict_simNodes[i].add_buffer(new_packet)
+                # Add packet ID to transmitter 'receive' list to prevent from receiving again
+                dict_simNodes[i].add_log_received_packets(new_packet)
+                dict_simNodes[i].log_gen_packets += 1
+                # Set last time packet generated
+                dict_simNodes[i].time_gen_packet = dict_simNodes[i].internal_clock
 
+        # Action List --------------------------------------------------------------------------------------------------
         # Add all nodes where mode_time ended to action list
         if dict_simNodes[i].mode_time <= 0:
             list_actions.append(dict_simNodes[i])
 
-    # Add time to network clock and hour log
-    simTime += delta_time
-    hour_log += delta_time
-
     # Action management
-    for node in list_actions:
+    for action_node in list_actions:
 
-        # Receiver Notify Transmitter that Packet was lost due to collision for logging
-        if node.mode == 'RX_payload':
-            if node.recv_collision:
-                # print("NodeID", node.node_id, "Collision Drop Packet with ID", node.recv_payload[0].packet_id)
-                for pl in node.recv_payload:
-                    dict_simNodes[pl.transmitter_id].log_tx_fail_collision += 1
-                    node.log_rx_fail_collision += 1
-        if node.mode == 'RX_header':
-            if node.recv_collision:
-                # print("ID",node.node_id, "Set Header Collision")
-                for pre in node.recv_payload:
-                    dict_simNodes[pre.transmitter_id].log_tx_fail_collision += 1
-                    node.log_rx_fail_collision += 1
+        # Actions at end of mode
+        action_end_mode(action_node)
 
-        # No Link-Layer ACK
-        if not Sim.link_layer_ack():
-            # Transmitter delete packet after sending
-            if dict_simNodes[node.node_id].mode == 'TX_payload':
-                dict_simNodes[node.node_id].remove_buffer(dict_simNodes[node.node_id].payload_buffer[0])
-
-            # Receiver Notify Transmitter - Packet Successfully Received
-            if dict_simNodes[node.node_id].mode == 'STANDBY_read':
-                add_packet_to_buffer(dict_simNodes, node.node_id)
-
-        # Link-Layer ACK - Receiver reply, with receiver reply
-        # Not for broadcast packets
-        else:
-            print("No Link-Layer ACK Implemented")
-
-        # Add consumption for Logging
-        if (node.mode == 'RX_timeout'
-                or node.mode == 'RX_sync'
-                or node.mode == 'RX_preamble'
-                or node.mode == 'RX_word'
-                or node.mode == 'RX_header'
-                or node.mode == 'RX_address'
-                or node.mode == 'RX_payload'):
-            dict_simNodes[node.node_id].log_consumption_rx += node.mode_consumption
-
-        if node.mode == 'CAD':
-            dict_simNodes[node.node_id].log_consumption_rx += node.mode_consumption
-
-        if (node.mode == 'TX_preamble'
-                or node.mode == 'TX_word'
-                or node.mode == 'TX_payload'):
-            dict_simNodes[node.node_id].log_consumption_tx += node.mode_consumption
-
-        if (node.mode == 'STANDBY_start'
-                or node.mode == 'STANDBY_write'
-                or node.mode == 'STANDBY_read'
-                or node.mode == 'STANDBY_clear'
-                or node.mode == 'STANDBY_detected'
-                or node.mode == 'STANDBY_stop'):
-            dict_simNodes[node.node_id].log_consumption_standby += node.mode_consumption
-
-        if node.mode == 'SLEEP':
-            dict_simNodes[node.node_id].log_consumption_sleep += node.mode_consumption
-
-        dict_simNodes[node.node_id].consumption += node.mode_consumption  # add previous mode consumption
-        dict_simNodes[node.node_id].mode_consumption = 0
         # Switch Modes
-        dict_simNodes[node.node_id] = switch_mode(node)
+        action_node = switch_mode(action_node)
 
+        # Actions at start of mode
+        # action_start_mode(action_node)
         # Transmitter Notify Neighbor - Preamble
-        if dict_simNodes[node.node_id].mode == 'TX_preamble':
-            set_neighbors_preamble(dict_simNodes, node.node_id)
+        if dict_simNodes[action_node.node_id].mode == 'TX_preamble':
+            set_neighbors_preamble(dict_simNodes, action_node.node_id)
 
         # Transmitter Notify Neighbor - Preamble Done, add Payload
-        if dict_simNodes[node.node_id].mode == 'TX_word':
-            set_neighbors_payload(dict_simNodes, node.node_id)
+        if dict_simNodes[action_node.node_id].mode == 'TX_word':
+            set_neighbors_payload(dict_simNodes, action_node.node_id)
 
         # Receiver Check Collision when RX_word starts
-        if dict_simNodes[node.node_id].mode == 'RX_word':
-            set_collision(node)
+        if dict_simNodes[action_node.node_id].mode == 'RX_word':
+            set_collision(action_node)
 
-
-    # Increase timer by microseconds to next network action and print node actions to individual Log
+    # Increase cycle counter
     sim_cycle += 1
 
     # print progress for debug every 5min
@@ -598,29 +695,6 @@ while simTime <= simRuntime:
 # End Simulation - Logging
 print("End Simulation")
 for i in dict_simNodes:
-    '''
-    print("---- ID", dict_simNodes[i].node_id, "Consumption", dict_simNodes[i].consumption, "-------------------")
-    print_txt = ""
-    for p in dict_simNodes[i].log_received_packets:
-        if p.source_id != dict_simNodes[i].node_id:
-            print_txt += str(p.packet_id) + ";"
-    print("Received packet IDs", print_txt)
-    print("Received packet", dict_simNodes[i].log_received_packets)
-
-    print("Total received packets", dict_simNodes[i].log_rx_all_p)
-    print("Total transmitted packets", dict_simNodes[i].log_tx_all_p,
-          "multi neighbors", len(dict_simNodes[i].neighbors) * dict_simNodes[i].log_tx_all_p)
-    print("Total delivered packets", dict_simNodes[i].log_tx_success_p)
-    print("Lost Send packets", dict_simNodes[i].log_tx_fail_per)
-    print("Collision Send packets", dict_simNodes[i].log_tx_fail_collision)
-    print("Duplicate Received packets", dict_simNodes[i].log_rx_fail_duplicate)
-    print("Buffer Full Received packets", dict_simNodes[i].log_rx_fail_buffer)
-    print("Max Buffer Measured", dict_simNodes[i].log_buffer_max)
-    print("Links", dict_simNodes[i].log_tx_links)
-
-    print("log_sink_rx_success",dict_simNodes[i].log_sink_rx_success)
-    print("log_sink_tx_success", dict_simNodes[i].log_sink_tx_success)
-    '''
     # Calculate Node average end-to-end delay for uplink
     # avg delay
     for d in dict_simNodes[i].log_sink_delay:
@@ -662,14 +736,21 @@ for i in dict_simNodes:
 # Network Sink Delay Calculation statistics
 if len(dict_simNodes) - 1 > 0:
     network_delay = network_delay / (len(dict_simNodes) - 1)  # calculate average
+    network_delay /= 10 ** -6  # Convert from µs to seconds
 else:
     network_delay = 0
 
 # Network Logging
 print("------------------ Network --------------------------")
 print("Network Consumption", network_consumption)
+print("Network Consumption RX", network_consumption_rx)
+print("Network Consumption TX", network_consumption_tx)
+print("Network Consumption STANDBY", network_consumption_standby)
+print("Network Consumption SLEEP", network_consumption_sleep)
+print("")
 print("Network Unique Sink Delivered packets", network_sink_rx_success)
 print("Network Nodes received total packets from Sink", network_sink_tx_success)
+print("")
 print("Network average end-to-end delay", network_delay)
 print("Network Received packets", network_received)
 print("Network Collision Received packets", network_rx_col)
