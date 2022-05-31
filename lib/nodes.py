@@ -124,6 +124,7 @@ class SimNode:
         self.__log_consumption_sleep = 0.0
         self.__log_received_packets = []
         self.__log_rx_all_p = 0  # __log_total_received_packets
+        self.__log_rx_success_p = 0
         self.__log_rx_fail_collision = 0
         self.__log_rx_fail_duplicate = 0  # __log_total_duplicat_packets
         self.__log_rx_fail_buffer = 0    # __log_total_buffer_full_packets
@@ -317,6 +318,14 @@ class SimNode:
     @log_rx_all_p.setter
     def log_rx_all_p(self, value):
         self.__log_rx_all_p = value
+
+    @property
+    def log_rx_success_p (self):
+        return self.__log_rx_success_p
+
+    @log_rx_success_p .setter
+    def log_rx_success(self, value):
+        self.log_rx_success_p = value
 
     @property
     def log_rx_fail_collision(self):

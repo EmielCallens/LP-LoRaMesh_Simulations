@@ -142,8 +142,14 @@ def switch_mode(node):
 
     # END - RX_header
     if node.mode == 'RX_header':
-        # See if there was collision
-        if node.recv_collision:
+        # Check for duplicate packet (SourceID and PacketID IRL, just PacketID in sim)
+        dup = False
+        for packet in node.log_received_packets:
+            if node.recv_payload[0].packet_id == packet.packet_id:
+                dup = True
+
+        # See if there was collision or duplication
+        if node.recv_collision or dup:
             # Start - STANDBY_stop
             # print("ID",node.node_id,"header collision",node.recv_preamble,node.recv_payload)
             new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
@@ -245,8 +251,6 @@ def switch_mode(node):
         # print("ID",node.node_id,"End Payload")
         # Start - STANDBY_stop
         new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
-        # Log - packet transmitted
-        node.log_tx_all_p += 1
 
     # END - SLEEP
     if node.mode == 'SLEEP':
@@ -261,145 +265,181 @@ def switch_mode(node):
 
 
 # Actions when a mode ends
-def action_end_mode(action_node):
+def action_end_mode(node):
 
     # --- RX ---
-    if action_node.mode == 'RX_timeout':
+    if node.mode == 'RX_timeout':
 
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'RX_sync':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_sync':
 
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'RX_preamble':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_preamble':
 
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'RX_word':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_word':
 
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'RX_header':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_header':
 
-        '''
         # Collision Actions
-        if action_node.recv_collision:
-            for packet in action_node.recv_payload:
+        if node.recv_collision:
+            for packet in node.recv_payload:
                 # Remove payloads
-                action_node.remove_recv_payload(packet)
+                node.remove_recv_payload(packet)
                 # Logging Collision
                 dict_simNodes[packet.transmitter_id].log_tx_fail_collision += 1
-                action_node.log_rx_fail_collision += 1
-                '''
+                node.log_rx_fail_collision += 1
+
+        else:
+            # Duplicate Check
+            for packet in node.log_received_packets:
+                if node.recv_payload[0].packet_id == packet.packet_id:
+                    # Remove payload
+                    node.remove_recv_payload(node.recv_payload[0])
+                    # Logging duplicate
+                    node.log_rx_fail_duplicate += 1
+                    dict_simNodes[packet.transmitter_id].log_tx_fail_duplicate += 1
+
+
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'RX_address':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_address':
         # Logging Rejected
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'RX_payload':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_payload':
 
         # Collision Actions
-        if action_node.recv_collision:
-            for packet in action_node.recv_payload:
+        if node.recv_collision:
+            for packet in node.recv_payload:
                 # Remove payloads
-                action_node.remove_recv_payload(packet)
+                node.remove_recv_payload(packet)
                 # Logging Collision
                 dict_simNodes[packet.transmitter_id].log_tx_fail_collision += 1
-                action_node.log_rx_fail_collision += 1
+                node.log_rx_fail_collision += 1
 
         # Logging Consumption
-        action_node.log_consumption_rx += action_node.mode_consumption
-    elif action_node.mode == 'CAD':
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'CAD':
 
         # Consumption Logging
-        action_node.log_consumption_rx += action_node.mode_consumption
+        node.log_consumption_rx += node.mode_consumption
 
     # --- TX ---
-    elif action_node.mode == 'TX_preamble':
+    elif node.mode == 'TX_preamble':
 
         # Consumption Logging
-        action_node.log_consumption_tx += action_node.mode_consumption
-    elif action_node.mode == 'TX_word':
+        node.log_consumption_tx += node.mode_consumption
+    elif node.mode == 'TX_word':
 
         # Consumption Logging
-        action_node.log_consumption_tx += action_node.mode_consumption
-    elif action_node.mode == 'TX_payload':
+        node.log_consumption_tx += node.mode_consumption
+    elif node.mode == 'TX_payload':
+
+        # Link-Layer ACK
+        # No LLA
+        if not Sim.link_layer_ack() or node.payload_buffer[0].target_id == 'broadcast':
+            # Transmitter delete packet after sending
+            node.remove_buffer(node.payload_buffer[0])
+            # Log - packet transmitted
+            node.log_tx_all_p += 1
+
+        # LLA (not for broadcast packets)
+        else:
+            print("No Link-Layer ACK Implemented")
 
         # Consumption Logging
-        action_node.log_consumption_tx += action_node.mode_consumption
+        node.log_consumption_tx += node.mode_consumption
 
     # --- STANDBY ---
-    elif action_node.mode == 'STANDBY_start':
+    elif node.mode == 'STANDBY_start':
 
         # Consumption Logging
-        action_node.log_consumption_standby += action_node.mode_consumption
-    elif action_node.mode == 'STANDBY_write':
+        node.log_consumption_standby += node.mode_consumption
+    elif node.mode == 'STANDBY_write':
 
         # Consumption Logging
-        action_node.log_consumption_standby += action_node.mode_consumption
-    elif action_node.mode == 'STANDBY_read':
+        node.log_consumption_standby += node.mode_consumption
+    elif node.mode == 'STANDBY_read':
+
+        # Link-Layer ACK
+        # No LLA
+        if not Sim.link_layer_ack() or node.payload_buffer[0].target_id == 'broadcast':
+            # Add packet
+            state_buffer = add_packet_to_buffer(dict_simNodes, node.node_id)
+            new_packet = node.recv_payload[0]
+            node.remove_recv_payload(node.recv_payload[0])
+
+            # Logging for successful packet reception
+            if state_buffer == 'success':
+                node.add_log_received_packets(new_packet)
+                node.log_rx_success_p += 1
+                dict_simNodes[new_packet.transmitter_id].log_tx_success_p += 1
+                node.log_buffer_max = len(node.payload_buffer)
+
+                # Special Logging for Packets from Sink
+                if new_packet.source_id == '0':
+                    node.log_sink_tx_success += 1
+
+                # Special Logging for Sink
+                if node.node_id == '0':
+                    # Log Delay on Source Node
+                    dict_simNodes[new_packet.source_id].add_log_sink_delay(simTime - new_packet.source_timestamp)
+                    # Log Packet delivered on Source Node
+                    dict_simNodes[new_packet.source_id].log_sink_rx_success += 1
+
+            # Logging for buffer overflow failure
+            elif state_buffer == 'buffer':
+                node.log_rx_fail_buffer += 1
+                dict_simNodes[new_packet.transmitter_id].log_tx_fail_buffer += 1
+
+            else:
+                print("Unknown buffer packet error")
+
+        # LLA
+        else:
+            print("No Link-Layer ACK Implemented")
 
         # Consumption Logging
-        action_node.log_consumption_standby += action_node.mode_consumption
-    elif action_node.mode == 'STANDBY_clear':
+        node.log_consumption_standby += node.mode_consumption
+    elif node.mode == 'STANDBY_clear':
 
         # Consumption Logging
-        action_node.log_consumption_standby += action_node.mode_consumption
-    elif action_node.mode == 'STANDBY_detected':
+        node.log_consumption_standby += node.mode_consumption
+    elif node.mode == 'STANDBY_detected':
 
         # Consumption Logging
-        action_node.log_consumption_standby += action_node.mode_consumption
-    elif action_node.mode == 'STANDBY_stop':
+        node.log_consumption_standby += node.mode_consumption
+    elif node.mode == 'STANDBY_stop':
 
         # Consumption Logging
-        action_node.log_consumption_standby += action_node.mode_consumption
+        node.log_consumption_standby += node.mode_consumption
 
     # --- SLEEP ---
-    elif action_node.mode == 'SLEEP':
+    elif node.mode == 'SLEEP':
 
         # Consumption Logging
-        action_node.log_consumption_sleep += action_node.mode_consumption
+        node.log_consumption_sleep += node.mode_consumption
 
     # --- POWER_OFF ---
-    elif action_node.mode == 'POWER_OFF':
+    elif node.mode == 'POWER_OFF':
         print("No actions for Power_Off for now")
 
     else:
-        print("Action End of Mode, Mode doesn't exist", action_node.mode)
+        print("Action End of Mode, Mode doesn't exist", node.mode)
 
     # --- General Actions ---
     # Log Consumption
-    action_node.consumption += action_node.mode_consumption
+    node.consumption += node.mode_consumption
     # Reset Consumption
-    action_node.mode_consumption = 0
+    node.mode_consumption = 0
 
-    '''
-            
-            if action_node.mode == 'RX_header':
-                if action_node.recv_collision:
-                    # print("ID",node.node_id, "Set Header Collision")
-                    for pre in action_node.recv_payload:
-                        dict_simNodes[pre.transmitter_id].log_tx_fail_collision += 1
-                        action_node.log_rx_fail_collision += 1
 
-            # No Link-Layer ACK
-            if not Sim.link_layer_ack():
-                # Transmitter delete packet after sending
-                if dict_simNodes[action_node.node_id].mode == 'TX_payload':
-                    dict_simNodes[action_node.node_id].remove_buffer(dict_simNodes[action_node.node_id].payload_buffer[0])
-
-                # Receiver Notify Transmitter - Packet Successfully Received
-                if dict_simNodes[action_node.node_id].mode == 'STANDBY_read':
-                    add_packet_to_buffer(dict_simNodes, action_node.node_id)
-
-            # Link-Layer ACK - Receiver reply, with receiver reply
-            # Not for broadcast packets
-            else:
-                print("No Link-Layer ACK Implemented")
-
-            '''
 
 
 
@@ -499,70 +539,35 @@ def gen_packet(packet_node, serial_no):
 
 
 def add_packet_to_buffer(nodes, receiver_id):
+    state = ''
+    # Recv Node
     receiver_node = nodes[receiver_id]
-
     # Packet
-    # print("Remove payload", receiver_node.recv_payload[0].transmitter_id,"From ID", receiver_node.node_id, )
     received_packet = receiver_node.recv_payload[0]
-    receiver_node.remove_recv_payload(receiver_node.recv_payload[0])
 
-    # Check Packet ID for duplicate
-    bool_no_duplicate = True
-    for p in receiver_node.log_received_packets:
-        if received_packet.packet_id == p.packet_id:
-            bool_no_duplicate = False
-    # Add packet to buffer if not duplicate
-    if bool_no_duplicate:
+    # Initiate new packet (to prevent duplication problem)
+    buffer_packet = SimPacket(received_packet.source_id,
+                              received_packet.source_timestamp,
+                              received_packet.total_payload_length,
+                              dict_simNodes[receiver_node.node_id].routing_tabel[received_packet.destination_id],
+                              received_packet.destination_id,
+                              received_packet.packet_id)
+    buffer_packet.transmitter_id = receiver_node.node_id
+    buffer_packet.hop_count = received_packet.hop_count + 1
 
-        # new packet (to prevent duplication problem)
-        buffer_packet = SimPacket(received_packet.source_id,
-                                  received_packet.source_timestamp,
-                                  received_packet.total_payload_length,
-                                  dict_simNodes[receiver_node.node_id].routing_tabel[received_packet.destination_id],
-                                  received_packet.destination_id,
-                                  received_packet.packet_id)
-        buffer_packet.transmitter_id = receiver_node.node_id
-        buffer_packet.hop_count = received_packet.hop_count + 1
+    # save payload
+    if receiver_node.node_id != '0':
+        # Check if buffer is full
+        if len(receiver_node.payload_buffer) <= Sim.buffer_limit():
+            state = 'success'
+            # Store packet in payload buffer to transmit
+            receiver_node.add_buffer(buffer_packet)
 
-        # save payload
-        if receiver_node.node_id != '0':
-            # Check if buffer is full
-            if len(receiver_node.payload_buffer) <= Sim.buffer_limit():
-                # Tell Transmitter it was received (no link-layer) only for logging purpose
-                nodes[received_packet.transmitter_id].log_tx_success_p += 1
-                # Log received packet
-                receiver_node.add_log_received_packets(received_packet)
-                # Store packet in payload buffer to transmit
-                receiver_node.add_buffer(buffer_packet)
-                # Sink Downlink (TX) was successful to this node
-                if received_packet.source_id == '0':
-                    receiver_node.log_sink_tx_success += 1
-
-                # Log buffer max size
-                if receiver_node.log_buffer_max < len(receiver_node.payload_buffer):
-                    receiver_node.log_buffer_max = len(receiver_node.payload_buffer)
-            # Packet rejected due to buffer full
-            else:
-                receiver_node.log_rx_fail_buffer += 1
-                nodes[received_packet.transmitter_id].log_tx_fail_buffer += 1
-
+        # Packet rejected due to buffer full
         else:
-            # Packet arrived at sink, Log packet
-            # Tell transmitter it arrived successfully
-            nodes[received_packet.transmitter_id].log_tx_success_p += 1
-            # Record delay at source ID
-            tmp_sink_delay = simTime - buffer_packet.source_timestamp
-            nodes[received_packet.source_id].add_log_sink_delay(tmp_sink_delay)
-            # Tell Source that packet was delivered successfully to Sink
-            nodes[received_packet.source_id].log_sink_rx_success += 1
-            # Add Packet to Sink received packets
-            receiver_node.add_log_received_packets(received_packet)
+            state = 'buffer'
 
-    else:
-        # Receiver records amount of duplicated packets received
-        nodes[receiver_id].log_rx_fail_duplicate += 1
-        nodes[received_packet.transmitter_id].log_tx_fail_duplicate += 1
-
+    return state
 
 
 

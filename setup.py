@@ -52,11 +52,12 @@ class Sim1:
 
     @staticmethod
     def byte_mesh_header():
-        return 2  # options: total number of mesh header bytes for this protocol
+        return 4  # options: total number of mesh header bytes for this protocol
 
     @staticmethod
     def mesh_header():
-        return ['sourceID']  # options: targetID, sourceID, destinationID, transmitterID, hop_count
+        # options: targetID, sourceID, destinationID, transmitterID, packetID, hop_count
+        return ['sourceID', 'packetID']
 
     @staticmethod
     def buffer_limit():
