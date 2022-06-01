@@ -142,30 +142,33 @@ def switch_mode(node):
 
     # END - RX_header
     if node.mode == 'RX_header':
-        # Check for duplicate packet (SourceID and PacketID IRL, just PacketID in sim)
-        dup = False
-        for packet in node.log_received_packets:
-            if node.recv_payload[0].packet_id == packet.packet_id:
-                dup = True
-
         # See if there was collision or duplication
-        if node.recv_collision or dup:
+        if node.recv_collision:
             # Start - STANDBY_stop
-            # print("ID",node.node_id,"header collision",node.recv_preamble,node.recv_payload)
             new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
-            # clear recv_payload sleep should be longer then any payload transmission
-            for payload in node.recv_payload:
-                node.remove_recv_payload(payload)
         else:
             # Start - RX_address
             new_mode, new_time, new_consumption = modes.RX_address(node)
 
     # END - RX_address
     if node.mode == 'RX_address':
-        # Packet not ment for node
+        # Check for duplicate packet (SourceID and PacketID IRL, just PacketID in sim)
+        dup = False
+        for packet in node.log_received_packets:
+            if node.recv_payload[0].packet_id == packet.packet_id:
+                dup = True
+
+        # Stop - Packet Not for node
         if node.recv_payload[0].target_id != node.node_id and node.recv_payload[0].target_id != 'broadcast':
-            # Start - SLEEP
-            new_mode, new_time, new_consumption = modes.SLEEP(node)
+            # Start - STANDBY_stop
+            new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+
+        # Stop - Packet duplicate
+        elif dup:
+            # Start - STANDBY_stop
+            new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
+
+        # Continue Receive
         else:
             # Start - RX_payload
             new_mode, new_time, new_consumption = modes.RX_payload(node)
@@ -175,11 +178,7 @@ def switch_mode(node):
         # See if there was collision
         if node.recv_collision:
             # Start - STANDBY_stop because there was collision
-            # print("payload.collision")
             new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
-            # clear recv_payload sleep should be longer then any payload transmission
-            for payload in node.recv_payload:
-                node.remove_recv_payload(payload)
 
         else:
             # Start - STANDBY_read there was no collision
@@ -233,7 +232,7 @@ def switch_mode(node):
 
     # END - STANDBY_stop
     if node.mode == 'STANDBY_stop':
-        # Start - RX_SLEEP
+        # Start - SLEEP
         new_mode, new_time, new_consumption = modes.SLEEP(node)
 
     # END - TX_preamble
@@ -248,7 +247,6 @@ def switch_mode(node):
 
     # END - TX_payload
     if node.mode == 'TX_payload':
-        # print("ID",node.node_id,"End Payload")
         # Start - STANDBY_stop
         new_mode, new_time, new_consumption = modes.STANDBY_stop(node)
 
@@ -266,7 +264,6 @@ def switch_mode(node):
 
 # Actions when a mode ends
 def action_end_mode(node):
-
     # --- RX ---
     if node.mode == 'RX_timeout':
 
@@ -291,25 +288,38 @@ def action_end_mode(node):
             for packet in node.recv_payload:
                 # Remove payloads
                 node.remove_recv_payload(packet)
+                # Set not target for longer sleep when trying to send
+                node.recv_not_target = True
                 # Logging Collision
                 dict_simNodes[packet.transmitter_id].log_tx_fail_collision += 1
                 node.log_rx_fail_collision += 1
 
+        # Consumption Logging
+        node.log_consumption_rx += node.mode_consumption
+    elif node.mode == 'RX_address':
+
+        # Log Rejected
+        if node.node_id != node.recv_payload[0].target_id and node.recv_payload[0].target_id != 'broadcast':
+            # Remove payload
+            node.remove_recv_payload(node.recv_payload[0])
+            # Set not target for longer sleep when trying to send
+            node.recv_not_target = True
+            # Logging rejected
+            node.log_rx_fail_address += 1
+            dict_simNodes[node.recv_payload[0].transmitter_id].log_tx_fail_address += 1
+
+        # Log Duplicate
         else:
-            # Duplicate Check
             for packet in node.log_received_packets:
                 if node.recv_payload[0].packet_id == packet.packet_id:
                     # Remove payload
                     node.remove_recv_payload(node.recv_payload[0])
+                    # Set not target for longer sleep when trying to send
+                    node.recv_not_target = True
                     # Logging duplicate
                     node.log_rx_fail_duplicate += 1
                     dict_simNodes[packet.transmitter_id].log_tx_fail_duplicate += 1
 
-
-        # Consumption Logging
-        node.log_consumption_rx += node.mode_consumption
-    elif node.mode == 'RX_address':
-        # Logging Rejected
         # Consumption Logging
         node.log_consumption_rx += node.mode_consumption
     elif node.mode == 'RX_payload':
@@ -416,13 +426,15 @@ def action_end_mode(node):
         # Consumption Logging
         node.log_consumption_standby += node.mode_consumption
     elif node.mode == 'STANDBY_stop':
+        # Clear receive buffer before sleep
+        for payload in node.recv_payload:
+            node.remove_recv_payload(payload)
 
         # Consumption Logging
         node.log_consumption_standby += node.mode_consumption
 
     # --- SLEEP ---
     elif node.mode == 'SLEEP':
-
         # Consumption Logging
         node.log_consumption_sleep += node.mode_consumption
 
@@ -440,7 +452,65 @@ def action_end_mode(node):
     node.mode_consumption = 0
 
 
+# ======================================================================================================================
+def action_start_mode(node):
+    # --- RX ---
+    if node.mode == 'RX_timeout':
+        print("No actions for RX_timeout")
+    elif node.mode == 'RX_sync':
+        print("No actions for RX_sync")
+    elif node.mode == 'RX_preamble':
+        print("No actions for RX_preamble")
+    elif node.mode == 'RX_word':
+        print("No actions for RX_word")
+    elif node.mode == 'RX_header':
+        print("No actions for RX_header")
+    elif node.mode == 'RX_address':
+        print("No actions for RX_address")
+    elif node.mode == 'RX_payload':
+        print("No actions for RX_payload")
+    elif node.mode == 'CAD':
+        print("No actions for CAD")
+    # --- TX ---
+    elif node.mode == 'TX_preamble':
+        print("No actions for TX_preamble")
+    elif node.mode == 'TX_word':
+        print("No actions for TX_word")
+    elif node.mode == 'TX_payload':
+        print("No actions for TX_payload")
+    # --- STANDBY ---
+    elif node.mode == 'STANDBY_start':
+        print("No actions for STANDBY_start")
+    elif node.mode == 'STANDBY_write':
+        print("No actions for STANDBY_write")
+    elif node.mode == 'STANDBY_read':
+        print("No actions for STANDBY_read")
+    elif node.mode == 'STANDBY_clear':
+        print("No actions for STANDBY_clear")
+    elif node.mode == 'STANDBY_detected':
+        print("No actions for STANDBY_detected")
+    elif node.mode == 'STANDBY_stop':
+        print("No actions for STANDBY_stop")
 
+    # --- SLEEP ---
+    elif node.mode == 'SLEEP':
+
+        # Update Collisions status
+        set_collision(node)
+
+        # Remove not target when starting sleep
+        node.recv_not_target = False
+
+        # Add permanent debug for payload leak
+        if len(node.recv_payload) != 0:
+            print("ID", node.node_id, "- ERROR - recv_payload not cleared out:", node.recv_payload)
+
+    # --- POWER_OFF ---
+    elif node.mode == 'POWER_OFF':
+        print("No actions for Power_Off")
+
+    else:
+        print("Action Start of Mode", node.mode ,"Doesn't exist")
 
 
 # Set Collision when neighbor node receive is active for TX_preamble and TX_payload (TX_word)

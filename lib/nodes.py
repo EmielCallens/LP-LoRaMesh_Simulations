@@ -116,6 +116,7 @@ class SimNode:
         self.__recv_payload = []
         self.__recv_address = ''
         self.__recv_collision = False
+        self.__recv_not_target = False  # receive status for bad Address or Duplicate message
 
         self.__consumption = 0.0  # count total node consumption in microJoule
         self.__log_consumption_rx = 0.0
@@ -125,6 +126,7 @@ class SimNode:
         self.__log_received_packets = []
         self.__log_rx_all_p = 0  # __log_total_received_packets
         self.__log_rx_success_p = 0
+        self.__log_rx_fail_address = 0
         self.__log_rx_fail_collision = 0
         self.__log_rx_fail_duplicate = 0  # __log_total_duplicat_packets
         self.__log_rx_fail_buffer = 0    # __log_total_buffer_full_packets
@@ -135,6 +137,7 @@ class SimNode:
         self.__log_tx_links = {}  # link activity log, transmit only
         self.__log_tx_success_p = 0  # __log_total_delivered_packets
         self.__log_tx_fail_per = 0  # __log_total_lost_packets
+        self.__log_tx_fail_address = 0
         self.__log_tx_fail_collision = 0  # __log_total_collision_packets
         self.__log_tx_fail_duplicate = 0  #
         self.__log_tx_fail_buffer = 0  #
@@ -262,6 +265,14 @@ class SimNode:
     def recv_collision(self, value):
         self.__recv_collision = value
 
+    @property
+    def recv_not_target(self):
+        return self.__recv_not_target
+
+    @recv_not_target.setter
+    def recv_not_target(self, value):
+        self.__recv_not_target = value
+
     # START LOG SECTION
     @property
     def consumption(self):
@@ -324,8 +335,16 @@ class SimNode:
         return self.__log_rx_success_p
 
     @log_rx_success_p .setter
-    def log_rx_success(self, value):
+    def log_rx_success_p(self, value):
         self.log_rx_success_p = value
+
+    @property
+    def log_rx_fail_address(self):
+        return self.__log_rx_fail_address
+
+    @log_rx_fail_address.setter
+    def log_rx_fail_address(self, value):
+        self.__log_rx_fail_address = value
 
     @property
     def log_rx_fail_collision(self):
@@ -399,6 +418,14 @@ class SimNode:
     @log_tx_fail_per.setter
     def log_tx_fail_per(self, value):
         self.__log_tx_fail_per = value
+
+    @property
+    def log_tx_fail_address(self):
+        return self.__log_tx_fail_address
+
+    @log_tx_fail_address.setter
+    def log_tx_fail_address(self, value):
+        self.__log_tx_fail_address = value
 
     @property
     def log_tx_fail_collision(self):

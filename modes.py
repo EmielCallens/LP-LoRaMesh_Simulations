@@ -41,12 +41,27 @@ def RX_header(node):
 
 def RX_address(node):
     mode = 'RX_address'
-    time = Sim.time_rx_address() + Sim.time_reg_2()
+    # Time to read both targetID and packetID separately
+    time = Sim.time_rx_address() + Sim.time_reg_2() + Sim.time_reg_2()
     consumption = time * ParamT.power_rx() * 10 ** -6
+
+    # Check if receiving packet is duplicate
+    dup = False
+    for packet in node.log_received_packets:
+        if node.recv_payload[0].packet_id == packet.packet_id:
+            dup = True
+
+    # Check Address missmatch, ignore packet with target 'broadcast'
     if node.recv_payload[0].target_id != node.node_id and node.recv_payload[0].target_id != 'broadcast':
-        # Packet is not ment for receiver, switch to SLEEP
+        # Packet is not ment for receiver, switch to STANDBY_stop
         time += Sim.time_reg_1()
-        consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
+        consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
+
+    elif dup:
+        # Switch to STANDBY_stop for duplicate packet
+        time += Sim.time_reg_1()
+        consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
+
     return mode, time, consumption
 
 
@@ -147,7 +162,6 @@ def TX_preamble(node):
 
 
 def TX_word(node):
-    # print("ID",node.node_id,"Payload")
     mode = 'TX_word'
     time = Sim.time_rx_syncword()
     consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
@@ -179,7 +193,10 @@ def SLEEP(node):
         if node.clock_drift != 0:
             time += Sim.time_cycle() / (node.clock_drift * 10 ** 6)
 
-    # Remove collision if it wasn't cleared because it happened in receive mode
-    if len(node.recv_preamble) + len(node.recv_payload) <= 1:
-        node.recv_collision = False
+    # If Not target was detected Node waits one extra cycle before trying to transmit
+    if node.recv_not_target and len(node.payload_buffer) > 0:
+        time += Sim.time_cycle()
+        if node.clock_drift != 0:
+            time += Sim.time_cycle() / (node.clock_drift * 10 ** 6)
+
     return mode, time, consumption
