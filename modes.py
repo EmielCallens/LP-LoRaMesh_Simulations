@@ -175,7 +175,7 @@ def TX_payload(node):
     return mode, time, consumption
 
 
-# --------- Transmit Modes --------- ---------
+# --------- Transmit Modes ------------------
 def SLEEP(node):
     mode = 'SLEEP'
     # Finish cycle in sleep mode
@@ -186,17 +186,5 @@ def SLEEP(node):
     # Switch to STANDBY_start
     time += Sim.time_reg_1()
     consumption = time * ParamT.power_sleep() * 10 ** -6
-
-    # If Collision was detected Node waits one extra cycle before trying to transmit
-    if node.recv_collision and len(node.payload_buffer) > 0:
-        time += Sim.time_cycle()
-        if node.clock_drift != 0:
-            time += Sim.time_cycle() / (node.clock_drift * 10 ** 6)
-
-    # If Not target was detected Node waits one extra cycle before trying to transmit
-    if node.recv_not_target and len(node.payload_buffer) > 0:
-        time += Sim.time_cycle()
-        if node.clock_drift != 0:
-            time += Sim.time_cycle() / (node.clock_drift * 10 ** 6)
 
     return mode, time, consumption

@@ -126,6 +126,7 @@ class SimNode:
         self.__log_received_packets = []
         self.__log_rx_all_p = 0  # __log_total_received_packets
         self.__log_rx_success_p = 0
+        self.__log_rx_fail_per = 0  # __log_total_lost_packets
         self.__log_rx_fail_address = 0
         self.__log_rx_fail_collision = 0
         self.__log_rx_fail_duplicate = 0  # __log_total_duplicat_packets
@@ -331,12 +332,20 @@ class SimNode:
         self.__log_rx_all_p = value
 
     @property
-    def log_rx_success_p (self):
+    def log_rx_success_p(self):
         return self.__log_rx_success_p
 
-    @log_rx_success_p .setter
+    @log_rx_success_p.setter
     def log_rx_success_p(self, value):
-        self.log_rx_success_p = value
+        self.__log_rx_success_p = value
+
+    @property
+    def log_rx_fail_per(self):
+        return self.__log_rx_fail_per
+
+    @log_rx_fail_per.setter
+    def log_rx_fail_per(self, value):
+        self.__log_rx_fail_per = value
 
     @property
     def log_rx_fail_address(self):
