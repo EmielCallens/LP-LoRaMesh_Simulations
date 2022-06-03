@@ -27,12 +27,12 @@ class Sim1:
     @staticmethod
     def n_cycle():
         # return 13402  # sample period, in symbols
-        return 1002
+        return 13402
 
     @staticmethod
     def n_preamble():
         # return 13404  # preamble length in symbols
-        return 1004
+        return 13404
 
     @staticmethod
     def target():
