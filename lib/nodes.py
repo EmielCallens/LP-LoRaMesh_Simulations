@@ -117,6 +117,7 @@ class SimNode:
         self.__recv_address = ''
         self.__recv_collision = False
         self.__recv_not_target = False  # receive status for bad Address or Duplicate message
+        self.__transmit_wait = False  # Wait with transmit 1 cycle (previous cycle not target or collision)
 
         self.__consumption = 0.0  # count total node consumption in microJoule
         self.__log_consumption_rx = 0.0
@@ -130,6 +131,7 @@ class SimNode:
         self.__log_rx_fail_address = 0
         self.__log_rx_fail_collision = 0
         self.__log_rx_fail_duplicate = 0  # __log_total_duplicat_packets
+        self.__log_rx_fail_missed = 0  # Didn't hear preamble, was probably sleeping
         self.__log_rx_fail_buffer = 0    # __log_total_buffer_full_packets
         self.__log_buffer_max = 0  # __log_max_buffer_size
 
@@ -141,6 +143,7 @@ class SimNode:
         self.__log_tx_fail_address = 0
         self.__log_tx_fail_collision = 0  # __log_total_collision_packets
         self.__log_tx_fail_duplicate = 0  #
+        self.__log_tx_fail_missed = 0  # Neighbor didn't hear preamble, was probably sleeping
         self.__log_tx_fail_buffer = 0  #
 
         self.__log_sink_rx_success = 0
@@ -250,6 +253,9 @@ class SimNode:
     def remove_recv_payload(self, value):
         self.__recv_payload.remove(value)
 
+    def clear_recv_payload(self):
+        self.__recv_payload = []
+
     @property
     def recv_address(self):
         return self.__recv_address
@@ -273,6 +279,14 @@ class SimNode:
     @recv_not_target.setter
     def recv_not_target(self, value):
         self.__recv_not_target = value
+
+    @property
+    def transmit_wait(self):
+        return self.__transmit_wait
+
+    @transmit_wait.setter
+    def transmit_wait(self, value):
+        self.__transmit_wait = value
 
     # START LOG SECTION
     @property
@@ -372,6 +386,14 @@ class SimNode:
         self.__log_rx_fail_duplicate = value
 
     @property
+    def log_rx_fail_missed(self):
+        return self.__log_rx_fail_missed
+
+    @log_rx_fail_missed.setter
+    def log_rx_fail_missed(self, value):
+        self.__log_rx_fail_missed = value
+
+    @property
     def log_rx_fail_buffer(self):
         return self.__log_rx_fail_buffer
 
@@ -451,6 +473,14 @@ class SimNode:
     @log_tx_fail_duplicate.setter
     def log_tx_fail_duplicate(self, value):
         self.__log_tx_fail_duplicate = value
+
+    @property
+    def log_tx_fail_missed(self):
+        return self.__log_tx_fail_missed
+
+    @log_tx_fail_missed.setter
+    def log_tx_fail_missed(self, value):
+        self.__log_tx_fail_missed = value
 
     @property
     def log_tx_fail_buffer(self):

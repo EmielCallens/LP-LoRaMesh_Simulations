@@ -82,11 +82,16 @@ def CAD(node):
 # --------- STANDBY Modes --------- ---------
 def STANDBY_start(node):
     mode = 'STANDBY_start'
-    if len(node.payload_buffer) == 0:
+    if len(node.payload_buffer) == 0 and node.cycle_time > 0:
         # Prepare detection, nothing to transmit
         time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
         consumption = ParamT.time_osc() * ParamT.power_standby() * 10 ** -6
         consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
+        consumption += ParamT.time_fs() * ParamT.power_rx() * 10 ** -6
+    elif node.cycle_time <= 0:
+        # No T_osc because we came straight from STANDBY of previous cycle
+        time = ParamT.time_fs() + Sim.time_reg_1()
+        consumption = Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
         consumption += ParamT.time_fs() * ParamT.power_rx() * 10 ** -6
     else:
         # Prepare SPI payload to FIFO buffer
@@ -179,9 +184,14 @@ def TX_payload(node):
 def SLEEP(node):
     mode = 'SLEEP'
     # Finish cycle in sleep mode
-    time = node.cycle_time
+    if node.cycle_time >= 0:
+        time = node.cycle_time
+    else:
+        # Permanent Debug Check
+        print("ERROR-ID", node.node_id, "SLEEP with negative cycle_time")
+        time = 0
     # Payload buffer has a packet, need to wake-up early for STANDBY_write
-    if len(node.payload_buffer) > 0:
+    if len(node.payload_buffer) > 0 and not node.transmit_wait:
         time -= Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
     # Switch to STANDBY_start
     time += Sim.time_reg_1()
