@@ -18,7 +18,7 @@ class Sim1:
 
     @staticmethod
     def runtime():
-        return 1000*1000*60*60 * 1.5   # run for 24h, in microseconds
+        return 1000*1000*60*60 * 24 * 7   # run for 24h, in microseconds
 
     @staticmethod
     def packet_gen_rate():
@@ -27,12 +27,13 @@ class Sim1:
     @staticmethod
     def n_cycle():
         # return 13402  # sample period, in symbols
-        return 13402
+        # As calculated always 2 symbols shorter for Reference Simulation
+        return Sim1.n_preamble() - 2
 
     @staticmethod
     def n_preamble():
         # return 13404  # preamble length in symbols
-        return 13404
+        return 6702
 
     @staticmethod
     def target():
