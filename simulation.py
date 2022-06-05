@@ -44,7 +44,7 @@ simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n50_sf7_area500x500_id0.csv"
+file_networkMap = "networkTopology/n50_sf7_area500x500_id2.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
@@ -301,7 +301,8 @@ def action_end_mode(node):
                 dict_simNodes[packet.transmitter_id].log_tx_fail_collision += 1
                 node.log_rx_fail_collision += 1
             # Remove all payloads from recv buffer
-            node.clear_recv_payload()
+            # Not needed will be removed by transmitter only payload and read are not removed by transmitter
+            # node.clear_recv_payload()
 
         # Consumption Logging
         node.log_consumption_rx += node.mode_consumption
@@ -312,6 +313,11 @@ def action_end_mode(node):
             node.recv_not_target = False
 
         # Log Rejected
+        # Permanent Debug to catch empty recv_payload error
+        if len(node.recv_payload) == 0:
+            print("ID", node.node_id, "End RX_address - node.recv_payload empty")
+            breakpoint()
+
         if node.node_id != node.recv_payload[0].target_id and node.recv_payload[0].target_id != 'broadcast':
             # print("ID", node.node_id, "RX_address Rejected Target:", node.recv_payload[0].target_id)
             # Remove payload
@@ -351,6 +357,14 @@ def action_end_mode(node):
 
             # Remove all payloads
             node.clear_recv_payload()
+
+        # Good Reception, should only have 1 packet in recv_payload, no collision
+        else:
+            # BUG LOG - Multiple packet on Read
+            if len(node.recv_payload) > 1:
+                print("ID", node.node_id, "Success Received, recv_buffer > 0, len, packetID, transmitterID",
+                      len(node.recv_payload), node.recv_payload.packet_id, node.recv_payload.transmitter_id)
+                breakpoint()
 
         # Logging Consumption
         node.log_consumption_rx += node.mode_consumption
@@ -406,6 +420,7 @@ def action_end_mode(node):
 
             # Logging for successful packet reception
             if state_buffer == 'success':
+
                 node.add_log_received_packets(packet)
                 node.log_rx_success_p += 1
                 dict_simNodes[packet.transmitter_id].log_tx_success_p += 1
@@ -449,7 +464,8 @@ def action_end_mode(node):
         node.log_consumption_standby += node.mode_consumption
     elif node.mode == 'STANDBY_clear':
         # Clear recv_payload if payload started from sleep and still going but no preamble was detected.
-        node.clear_recv_payload()
+        # Do I really need to clear this? No need next cycle it will already be gone by transmitter removing it
+        # node.clear_recv_payload()
         # Consumption Logging
         node.log_consumption_standby += node.mode_consumption
     elif node.mode == 'STANDBY_detected':
@@ -498,52 +514,52 @@ def action_start_mode(node):
     empty = ''
     # --- RX ---
     if node.mode == 'RX_timeout':
-        # print("ID", node.node_id, "RX_timeout")
+        print("ID", node.node_id, "RX_timeout")
         empty = ''
     elif node.mode == 'RX_sync':
-        # print("ID", node.node_id, "RX_sync")
+        print("ID", node.node_id, "RX_sync")
         empty = ''
     elif node.mode == 'RX_preamble':
-        # print("ID", node.node_id, "RX_preamble")
+        print("ID", node.node_id, "RX_preamble")
         empty = ''
     elif node.mode == 'RX_word':
-        # print("ID", node.node_id, "RX_word")
+        print("ID", node.node_id, "RX_word")
         # Receiver Check Collision when RX_word starts, start of sensitive data
         set_collision(node)
 
     elif node.mode == 'RX_header':
-        # print("ID", node.node_id, "RX_header")
+        print("ID", node.node_id, "RX_header- len(recv_payload)", len(node.recv_payload))
         empty = ''
     elif node.mode == 'RX_address':
-        # print("ID", node.node_id, "RX_address")
+        print("ID", node.node_id, "RX_address - len(recv_payload)", len(node.recv_payload))
         empty = ''
     elif node.mode == 'RX_payload':
-        # print("ID", node.node_id, "RX_payload")
+        print("ID", node.node_id, "RX_payload")
         empty = ''
     elif node.mode == 'CAD':
+        print("ID", node.node_id, "CAD")
         empty = ''
 
     # --- TX ---
     elif node.mode == 'TX_preamble':
-        # print("ID", node.node_id, "TX_preamble")
-        # print("TX_ID", node.node_id, "Preamble", node.transmit_wait)
+        print("ID", node.node_id, "TX_preamble")
         # Notify Neighbor and set collision, Log all rx, interrupt RX_timeout
         set_neighbors_preamble(dict_simNodes, node.node_id)
 
     elif node.mode == 'TX_word':
-        # print("ID", node.node_id, "TX_word, packetID", node.payload_buffer[0].packet_id)
+        print("ID", node.node_id, "TX_word, packetID", node.payload_buffer[0].packet_id)
         # Remove preamble, Per check add payload and collision check, interrupt Rx_preamble
         set_neighbors_payload(dict_simNodes, node.node_id)
 
     elif node.mode == 'TX_payload':
-        # print("ID", node.node_id, "TX_payload START")
+        print("ID", node.node_id, "TX_payload START")
         empty = ''
 
     # --- STANDBY ---
     elif node.mode == 'STANDBY_start':
+        print("ID", node.node_id, "S_start")
         # Update Collisions status, remove collision from sleep period
         set_collision(node)
-        # print("ID", node.node_id, "S_start")
         # Begin New cycle
         # Use + because when transmitting cycle_time will not have ended yet (early start)
         node.cycle_time += Sim.time_cycle()  # Add 1 cycle time
@@ -551,44 +567,35 @@ def action_start_mode(node):
             node.cycle_time += Sim.time_cycle() / (node.clock_drift * 10 ** 6)  # Add drift
 
     elif node.mode == 'STANDBY_write':
-        # print("ID", node.node_id, "S_write")
+        print("ID", node.node_id, "S_write")
         empty = ''
     elif node.mode == 'STANDBY_read':
+        print("ID", node.node_id, "S_read")
         # Reset transmit_wait, one cycle passed since standby_read end set it
         node.transmit_wait = False
-        # print("ID", node.node_id, "S_read")
         empty = ''
     elif node.mode == 'STANDBY_clear':
-        # print("ID", node.node_id, "S_clear")
+        print("ID", node.node_id, "S_clear")
         # Reset transmit_wait, one cycle passed since standby_read end set it
         node.transmit_wait = False
         empty = ''
     elif node.mode == 'STANDBY_detected':
-        # print("ID", node.node_id, "S_detected")
+        print("ID", node.node_id, "S_detected")
         empty = ''
     elif node.mode == 'STANDBY_stop':
+        print("ID", node.node_id, "S_stop")
         # Reset transmit_wait, one cycle passed since standby_stop end set it
         node.transmit_wait = False
-        # print("ID", node.node_id, "S_stop")
-        # for packet in node.recv_payload:
-            # print("--- Packet:", packet.packet_id, packet.transmitter_id)
         empty = ''
 
     # --- SLEEP ---
     elif node.mode == 'SLEEP':
+        print("ID", node.node_id, "SLEEP")
         # Update Collisions status, remove collision from during active period
         set_collision(node)
 
         # Remove not target when starting sleep
         node.recv_not_target = False
-        # Reset transmit_wait because action for this cycle finished
-        #node.transmit_wait = False
-
-        # Add permanent debug for payload leak
-        if len(node.recv_payload) != 0:
-            print("ID", node.node_id, "- ERROR - recv_payload not cleared out:", node.recv_payload,
-                  "[0] Packet_id, transmitter_id", node.recv_payload[0].packet_id, node.recv_payload[0].transmitter_id)
-            node.clear_recv_payload()
 
     # --- POWER_OFF ---
     elif node.mode == 'POWER_OFF':
@@ -607,13 +614,17 @@ def set_collision(receiver_node):
             or receiver_node.mode == 'RX_address' or receiver_node.mode == 'RX_payload'):
 
         # Set collision for multiple signals
-        if Sim.preamble_channel():  # Preamble Channel
-            if len(receiver_node.recv_payload) > 1:
-                receiver_node.recv_collision = True
+        if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) > 1:
+            receiver_node.recv_collision = True
 
-        else:  # No Preamble Channel
-            if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) > 1:
-                receiver_node.recv_collision = True
+    # Start of Receive Payload (to prevent use of wrong recv_payload after PER fail)
+    elif receiver_node.mode == 'RX_preamble' and receiver_node.mode_time == 0:
+        print("ID", receiver_node, "Set Collision at RX_preamble")
+
+        # Set collision for multiple signals
+        if len(receiver_node.recv_preamble) + len(receiver_node.recv_payload) > 1:
+            print("ID", receiver_node, "Collision True")
+            receiver_node.recv_collision = True
 
     # Not Receiving Payload
     else:
@@ -649,6 +660,18 @@ def set_neighbors_payload(nodes, transmitter_id):
 
     transmitter_node = nodes[transmitter_id]
     for n_id in transmitter_node.neighbors:
+
+        #  Interrupt RX_preamble
+        if nodes[n_id].mode == 'RX_preamble':
+            # reduce mode consumption by time left
+            remove_consumption = nodes[n_id].mode_time * ParamT.power_rx() * 10 ** -6
+            nodes[n_id].mode_consumption -= remove_consumption
+            nodes[n_id].mode_time = 0
+
+        # Set Collision for neighbors before removing preamble and trying to add payload
+        # This removes problem where an already active payload is taken as new payload and receive starts after PER fail
+        set_collision(nodes[n_id])
+
         # Stop preamble
         nodes[n_id].remove_recv_preamble(transmitter_id)
 
@@ -667,13 +690,6 @@ def set_neighbors_payload(nodes, transmitter_id):
             transmitter_node.log_tx_fail_per += 1
             nodes[n_id].log_rx_fail_per += 1
 
-        #  Interrupt RX_preamble
-        if nodes[n_id].mode == 'RX_preamble':
-            # reduce mode consumption by time left
-            remove_consumption = nodes[n_id].mode_time * ParamT.power_rx() * 10 ** -6
-            nodes[n_id].mode_consumption -= remove_consumption
-            nodes[n_id].mode_time = 0
-
 
 # Remove Neighbor Payload when not receiving
 def remove_neighbors_payload(nodes, transmitter_id):
@@ -684,8 +700,6 @@ def remove_neighbors_payload(nodes, transmitter_id):
 
         # Check Neighbor Mode if allowed to remove
         if neighbor_node.mode != 'RX_payload' and neighbor_node.mode != 'STANDBY_read':
-            # print("TX_ID", transmitter_node.node_id,
-            #     "clear payload on RX_ID", neighbor_node.node_id, neighbor_node.mode)
             # Check if not already removed by header or address
             if len(neighbor_node.recv_payload) != 0:
                 # Cycle all packets that neighbor is receiving
@@ -693,9 +707,15 @@ def remove_neighbors_payload(nodes, transmitter_id):
                     # Look for Packet that matches transmitted packet_id
                     if packet.packet_id == transmitter_node.payload_buffer[0].packet_id:
                         # Remove packet
-                        # print("ID", neighbor_node.node_id,
-                        #       "Remove recv_payload packetID, transmitterID", packet.packet_id, packet.transmitter_id)
                         neighbor_node.remove_recv_payload(packet)
+
+                        # !!!For Debug Only - find empty recv_payload bug!!!
+                        if neighbor_node.mode == 'RX_header' or neighbor_node.mode == 'RX_address':
+                            print("ID", transmitter_id, "TX Remove payload from, ID", n_id,
+                                  "PacketID", packet.packet_id)
+
+                        # Update collision - will only clear when not receiving
+                        set_collision(neighbor_node)
 
 
 def gen_packet(packet_node, serial_no):
@@ -925,21 +945,22 @@ print("Network Consumption TX", network_consumption_tx)
 print("Network Consumption STANDBY", network_consumption_standby)
 print("Network Consumption SLEEP", network_consumption_sleep)
 print("")
+print("Network Generated packets", network_gen_packets)
 print("Network Unique Sink Delivered packets", network_sink_rx_success)
 print("Network Nodes received total packets from Sink", network_sink_tx_success)
-print("")
 print("Network average end-to-end delay", network_delay)
+print("")
 print("Network Received packets", network_received)
 print("Network good received packets", network_rx_suc)
 print("Network corrupted PER receive", network_rx_per)
-print("Network Collision Received packets", network_rx_col)
-print("Network Address mismatch received packets", network_rx_adr)
-print("Network Received Duplicates packets", network_rx_dup)
 print("Network Receiver missed packets", network_rx_mis)
+print("Network Collision Received packets", network_rx_col)
+print("Network Received Duplicates packets", network_rx_dup)
+print("Network Address mismatch received packets", network_rx_adr)
 print("Network Received Lost Due to Buffer Full packets", network_rx_buf)
+print("")
 print("Network Buffer filled Max", network_rx_buf_max)
-
-print("Network Generated packets", network_gen_packets)
+print("")
 print("Network Transmitted packets", network_transmitted)
 print("Network Transmitted packets that where successfully received", network_tx_success)
 print("Network Lost packets", network_tx_per)

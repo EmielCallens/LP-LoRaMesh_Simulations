@@ -33,7 +33,7 @@ class Sim1:
     @staticmethod
     def n_preamble():
         # return 13404  # preamble length in symbols
-        return 6702
+        return 13404
 
     @staticmethod
     def target():
