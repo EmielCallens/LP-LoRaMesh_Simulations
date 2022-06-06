@@ -117,6 +117,7 @@ class SimNode:
         self.__recv_address = ''
         self.__recv_collision = False
         self.__recv_not_target = False  # receive status for bad Address or Duplicate message
+        self.__transmission_timeout = 10
         self.__transmit_wait = False  # Wait with transmit 1 cycle (previous cycle not target or collision)
 
         self.__consumption = 0.0  # count total node consumption in microJoule
@@ -279,6 +280,14 @@ class SimNode:
     @recv_not_target.setter
     def recv_not_target(self, value):
         self.__recv_not_target = value
+
+    @property
+    def transmission_timeout(self):
+        return self.__transmission_timeout
+
+    @transmission_timeout.setter
+    def transmission_timeout(self, value):
+        self.__transmission_timeout = value
 
     @property
     def transmit_wait(self):

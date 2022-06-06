@@ -19,7 +19,7 @@ from lib.param import ParamTopology as ParamT
 
 
 # Number of network nodes
-iNodes = 100
+iNodes = 50
 standardSF = 7  # Used to calculate min range to at least one neighbor node
 standardPtx = 13
 standardEnvironment = 'urban'

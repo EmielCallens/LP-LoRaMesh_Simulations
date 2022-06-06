@@ -5,6 +5,14 @@ import math
 
 class Sim1:
     @staticmethod
+    def sim_type():
+        # Reference = flood_rx, flood_cad, flood_channel
+        # Tree = RX_tree, CAD_tree, Packet_tree, Learn_tree
+        # Async Custom = async_energy
+        # Sync Custom = sync_energy
+        return 'flood_rx'
+
+    @staticmethod
     def sf():
         return 7
 
@@ -162,13 +170,14 @@ class Sim1:
     @staticmethod
     def all_methods():
         return {
+            'sim_type': Sim1.sim_type(),
             'sf': Sim1.sf(),
             'ptx': Sim1.ptx(),
             'env': Sim1.env(),
-            'runtime': Sim1.runtime(),
-            'packet_gen_rate': Sim1.packet_gen_rate(),
-            'n_cycle': Sim1.n_cycle(),
+            'runtime': str(Sim1.runtime() / (60 * 60 * 10 ** 6)) + " hours",  # time in hours
+            'packet_gen_rate': str(Sim1.packet_gen_rate() / (60 * 60 * 10 ** 6)) + " hours",  # time in hours
             'n_preamble': Sim1.n_preamble(),
+            'n_cycle': Sim1.n_cycle(),
             'target': Sim1.target(),
             'link_layer_ack': Sim1.link_layer_ack(),
             'detection_mode': Sim1.detection_mode(),
@@ -183,17 +192,17 @@ class Sim1:
             'de': Sim1.de(),
             'n_payload_max': Sim1.n_payload_max(),
             'n_payload_min': Sim1.n_payload_min(),
-            'time_cycle': Sim1.time_cycle(),
-            'time_preamble': Sim1.time_preamble(),
-            'rate_spi': Sim1.rate_spi(),
-            'time_reg_1': Sim1.time_reg_1(),
-            'time_reg_2': Sim1.time_reg_2(),
-            'time_reg_payload_255': Sim1.time_reg_payload_255(),
-            'time_reg_payload_mheader': Sim1.time_reg_payload_mheader(),
-            'time_rx_timeout': Sim1.time_rx_timeout(),
-            'time_rx_sync': Sim1.time_rx_sync(),
-            'time_rx_syncword': Sim1.time_rx_syncword(),
-            'time_rx_header': Sim1.time_rx_header(),
-            'time_rx_address': Sim1.time_rx_address(),
-            'time_rx_payload': Sim1.time_rx_payload()
+            'time_cycle': str(Sim1.time_cycle() / (10 ** 6)) + " s",
+            'time_preamble': str(Sim1.time_preamble() / (10 ** 6)) + " s",
+            'rate_spi': str(Sim1.rate_spi()) + " bit/s",
+            'time_reg_1': str(Sim1.time_reg_1()) + " µs",
+            'time_reg_2': str(Sim1.time_reg_2()) + " µs",
+            'time_reg_payload_255': str(Sim1.time_reg_payload_255()) + " µs",
+            'time_reg_payload_mheader': str(Sim1.time_reg_payload_mheader()) + " µs",
+            'time_rx_timeout': str(Sim1.time_rx_timeout()) + " µs",
+            'time_rx_sync': str(Sim1.time_rx_sync()) + " µs",
+            'time_rx_syncword': str(Sim1.time_rx_syncword()) + " µs",
+            'time_rx_header': str(Sim1.time_rx_header()) + " µs",
+            'time_rx_address': str(Sim1.time_rx_address()) + " µs",
+            'time_rx_payload': str(Sim1.time_rx_payload()) + " µs"
         }

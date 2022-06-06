@@ -82,16 +82,11 @@ def CAD(node):
 # --------- STANDBY Modes --------- ---------
 def STANDBY_start(node):
     mode = 'STANDBY_start'
-    if len(node.payload_buffer) == 0 and node.cycle_time > 0:
+    if len(node.payload_buffer) == 0 or node.transmit_wait or node.transmission_timeout > 0:
         # Prepare detection, nothing to transmit
         time = ParamT.time_osc() + ParamT.time_fs() + Sim.time_reg_1()
         consumption = ParamT.time_osc() * ParamT.power_standby() * 10 ** -6
         consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
-        consumption += ParamT.time_fs() * ParamT.power_rx() * 10 ** -6
-    elif node.cycle_time <= 0:
-        # No T_osc because we came straight from STANDBY of previous cycle
-        time = ParamT.time_fs() + Sim.time_reg_1()
-        consumption = Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
         consumption += ParamT.time_fs() * ParamT.power_rx() * 10 ** -6
     else:
         # Prepare SPI payload to FIFO buffer
@@ -125,7 +120,7 @@ def STANDBY_read(node):
 
 def STANDBY_clear(node):
     mode = 'STANDBY_clear'
-    if len(node.payload_buffer) == 0:
+    if len(node.payload_buffer) == 0 or node.transmit_wait or node.transmission_timeout > 0:
         # Switch to SLEEP
         time = Sim.time_reg_1()
         consumption = time * ParamT.power_standby() * 10 ** -6
@@ -159,7 +154,6 @@ def STANDBY_stop(node):
 
 # --------- Transmit Modes --------- ---------
 def TX_preamble(node):
-    # print("ID",node.node_id,"Preamble")
     mode = 'TX_preamble'
     time = Sim.time_preamble()
     consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
@@ -185,13 +179,11 @@ def SLEEP(node):
     mode = 'SLEEP'
     # Finish cycle in sleep mode
     if node.cycle_time >= 0:
-        time = node.cycle_time
+        time = node.cycle_time - Sim.time_reg_1()  # Wake up early to switch and keep cycle_time accurate
     else:
-        # Permanent Debug Check
-        print("ERROR-ID", node.node_id, "SLEEP with negative cycle_time")
         time = 0
     # Payload buffer has a packet, need to wake-up early for STANDBY_write
-    if len(node.payload_buffer) > 0 and not node.transmit_wait:
+    if len(node.payload_buffer) > 0 and not node.transmit_wait and node.transmission_timeout <= 0:
         time -= Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
     # Switch to STANDBY_start
     time += Sim.time_reg_1()
