@@ -120,6 +120,10 @@ class SimNode:
         self.__transmission_timeout = 10
         self.__transmit_wait = False  # Wait with transmit 1 cycle (previous cycle not target or collision)
 
+        # For Preamble Channel
+        self.__channel = 'preamble'  # Options: preamble; data
+
+        # Logging
         self.__consumption = 0.0  # count total node consumption in microJoule
         self.__log_consumption_rx = 0.0
         self.__log_consumption_tx = 0.0
@@ -296,6 +300,15 @@ class SimNode:
     @transmit_wait.setter
     def transmit_wait(self, value):
         self.__transmit_wait = value
+
+    # START PREAMBLE CHANNEL
+    @property
+    def channel(self):
+        return self.__channel
+
+    @channel.setter
+    def channel(self, value):
+        self.__channel = value
 
     # START LOG SECTION
     @property

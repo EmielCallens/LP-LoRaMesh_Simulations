@@ -55,12 +55,19 @@ def RX_address(node):
     if node.recv_payload[0].target_id != node.node_id and node.recv_payload[0].target_id != 'broadcast':
         # Packet is not ment for receiver, switch to STANDBY_stop
         time += Sim.time_reg_1()
-        consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
+        consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
 
     elif dup:
         # Switch to STANDBY_stop for duplicate packet
         time += Sim.time_reg_1()
-        consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
+        consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
+
+    elif Sim.preamble_channel() and node.channel == 'preamble':
+        print('Preamble Channel RX_address in modes.py')
+        # Switch to STANDBY_switch for preamble channel
+        time += Sim.time_reg_1()
+        consumption += Sim.time_reg_1() * ParamT.power_rx() * 10 ** -6
+        # Continue normal working when on 'data' channel
 
     return mode, time, consumption
 
@@ -97,9 +104,15 @@ def STANDBY_start(node):
 
 def STANDBY_write(node):
     mode = 'STANDBY_write'
-    # Write payload over SPI into FIFO Buffer
-    time = Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
-    consumption = time * ParamT.power_standby() * 10 ** -6
+    if not Sim.preamble_channel():
+        # Write payload over SPI into FIFO Buffer
+        time = Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
+        consumption = time * ParamT.power_standby() * 10 ** -6
+    else:
+        print('Preamble Channel STANDBY_write in modes.py')
+        # Write mesh header over SPI into FIFO Buffer for preamble package
+        time = Sim.time_reg_payload_value(Sim.byte_mesh_header())
+        consumption = time * ParamT.power_standby() * 10 ** -6
     # Switch to detection
     time += Sim.time_reg_1() + ParamT.time_fs()
     consumption += Sim.time_reg_1() * ParamT.power_standby() * 10 ** -6
@@ -152,6 +165,21 @@ def STANDBY_stop(node):
     return mode, time, consumption
 
 
+# For Preamble Channel only
+def STANDBY_switch(node):
+    print('Preamble Channel STANDBY_switch in modes.py')
+    mode = 'STANDBY_switch'
+    # Load Packet
+    time = Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
+    # Switch channel and prepare transmit
+    time += ParamT.time_hop() + Sim.time_reg_1()
+    consumption = time * ParamT.power_standby() * 10 ** -6
+    # Start FS for transmission
+    time += ParamT.time_fs()
+    consumption += ParamT.time_fs() * ParamT.power_rx() * 10 ** -6
+    return mode, time, consumption
+
+
 # --------- Transmit Modes --------- ---------
 def TX_preamble(node):
     mode = 'TX_preamble'
@@ -169,8 +197,15 @@ def TX_word(node):
 
 def TX_payload(node):
     mode = 'TX_payload'
-    time = Sim.time_rx_payload()
-    consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
+    # Transmit Preamble Packet
+    if Sim.preamble_channel() and node.channel == 'preamble':
+        print('Preamble Channel TX_payload in modes.py')
+        time = Sim.n_payload_min() * ParamT.time_symbol()[Sim.sf()]
+        consumption = time * ParamT.power_tx() * 10 ** -6
+    # Transmit Data Packet
+    else:
+        time = Sim.time_rx_payload()
+        consumption = time * ParamT.power_tx()[Sim.ptx()] * 10 ** -6
     return mode, time, consumption
 
 
@@ -182,9 +217,18 @@ def SLEEP(node):
         time = node.cycle_time - Sim.time_reg_1()  # Wake up early to switch and keep cycle_time accurate
     else:
         time = 0
-    # Payload buffer has a packet, need to wake-up early for STANDBY_write
+
     if len(node.payload_buffer) > 0 and not node.transmit_wait and node.transmission_timeout <= 0:
-        time -= Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
+        # Preamble Channel Off
+        if not Sim.preamble_channel():
+            # Payload buffer has a packet, need to wake-up early for STANDBY_write
+            time -= Sim.time_reg_payload_value(node.payload_buffer[0].total_payload_length)
+        # Preamble Channel On
+        else:
+            print('Preamble Channel SLEEP in modes.py')
+            # Wake up early to prepare Preamble Packet transmit if allowed
+            time -= Sim.time_reg_payload_value(Sim.byte_mesh_header())
+
     # Switch to STANDBY_start
     time += Sim.time_reg_1()
     consumption = time * ParamT.power_sleep() * 10 ** -6
