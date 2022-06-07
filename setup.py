@@ -40,8 +40,10 @@ class Sim1:
 
     @staticmethod
     def n_preamble():
-        # return 13404  # preamble length in symbols
-        return 13404
+        # return 13404 for n50  # preamble length in symbols
+        # 6579 for n100
+        # 3115 for n200
+        return 3115
 
     @staticmethod
     def target():

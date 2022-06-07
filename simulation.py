@@ -44,7 +44,7 @@ simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n50_sf7_area500x500_id4.csv"
+file_networkMap = "networkTopology/n200_sf7_area500x500_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
@@ -708,8 +708,10 @@ def remove_neighbors_payload(nodes, transmitter_id):
             if len(neighbor_node.recv_payload) != 0:
                 # Cycle all packets that neighbor is receiving
                 for packet in neighbor_node.recv_payload:
-                    # Look for Packet that matches transmitted packet_id
-                    if packet.packet_id == transmitter_node.payload_buffer[0].packet_id:
+                    # Look for Packet that matches transmitted packet_id,
+                    # make sure packet wasn't from another transmitter
+                    if (packet.packet_id == transmitter_node.payload_buffer[0].packet_id
+                            and packet.transmitter_id == transmitter_node.node_id):
                         # Remove packet
                         neighbor_node.remove_recv_payload(packet)
 
