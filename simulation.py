@@ -44,7 +44,7 @@ simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n50_sf7_area500x500_id2.csv"
+file_networkMap = "networkTopology/n50_sf7_area500x500_id3.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
