@@ -10,7 +10,7 @@ class Sim1:
         # Tree = RX_tree, CAD_tree, Packet_tree, Learn_tree
         # Async Custom = async_energy
         # Sync Custom = sync_energy
-        return 'flood_rx'
+        return 'flood_rx_preamble'
 
     @staticmethod
     def sf():
@@ -43,7 +43,7 @@ class Sim1:
         # return 13404 for n50  # preamble length in symbols
         # 6579 for n100
         # 3115 for n200
-        return 13404
+        return 6702
 
     @staticmethod
     def target():
