@@ -1,0 +1,35 @@
+sim_type: flood_rx
+sf: 7
+ptx: 13
+env: urban
+runtime: 168.0 hours
+packet_gen_rate: 1.0 hours
+n_preamble: 3115
+n_cycle: 3113
+target: broadcast
+link_layer_ack: False
+detection_mode: RX
+preamble_channel: False
+byte_mesh_header: 4
+mesh_header: ['sourceID', 'packetID']
+buffer_limit: 20
+payload: 255
+ih: 0
+crc: 1
+cr: 1
+de: 0
+n_payload_max: 378
+n_payload_min: 18
+time_cycle: 1.593856 s
+time_preamble: 1.59488 s
+rate_spi: 92160.0 bit/s
+time_reg_1: 174 탎
+time_reg_2: 261 탎
+time_reg_payload_255: 22222 탎
+time_reg_payload_mheader: 130 탎
+time_rx_timeout: 2048.0 탎
+time_rx_sync: 1024.0 탎
+time_rx_syncword: 8300.78125 탎
+time_rx_header: 2925.714285714286 탎
+time_rx_address: 1462.857142857143 탎
+time_rx_payload: 193536.0 탎

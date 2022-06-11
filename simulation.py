@@ -44,7 +44,7 @@ simRuntime = Sim.runtime()  # Simulation time in microseconds
 simTime = 0  # Active loop time in microseconds
 
 # Read networkTopology file
-file_networkMap = "networkTopology/n100_sf7_area500x500_id1.csv"
+file_networkMap = "networkTopology/n50_sf7_area500x500_id0.csv"
 dict_networkNodes = {}
 with open(file_networkMap, newline='') as csvfile:
     csvReader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
@@ -66,6 +66,7 @@ folder_path = os.path.join(folder_path, Sim.sim_type())
 name_topology = file_networkMap[file_networkMap.find('/')+1:file_networkMap.find('.csv')]
 
 folder_exists = True
+
 iter_sim = 0
 sim_folder_path = ''
 while folder_exists:
