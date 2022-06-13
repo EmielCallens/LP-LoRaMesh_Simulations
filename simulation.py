@@ -29,6 +29,7 @@ network_rx_dup = 0
 network_rx_mis = 0
 network_rx_buf = 0
 network_rx_buf_max = 0
+
 network_gen_packets = 0
 network_transmitted = 0
 network_tx_success = 0
