@@ -44,7 +44,7 @@ class Sim1:
         # 6579 for n100
         # 3115 for n200
         # 13404, 6702, 3351, 1676, 838, 419
-        return 1676
+        return 838
 
     @staticmethod
     def target():
